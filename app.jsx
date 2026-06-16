@@ -1,7 +1,10 @@
 // Prebuilt static bundle — React & Three are loaded as globals from CDN.
 const { useState, useRef, useEffect, useCallback, createContext, useContext } = React;
-// THREE is a global from three.min.js
+// THREE is a global from three.min.js. Leaflet (window.L) is loaded on demand.
 
+
+// Build version — shown next to the "Powered by" credit. Bump on each release.
+const BUILD_VERSION = "v6.1.0";
 
 // ════════════════════════════════════════════════════════════════════════════
 //  THEME — "Field Guide": bright modern SaaS × printed trail-guide warmth.
@@ -125,13 +128,15 @@ const ThemeToggle = ({ style }) => {
 // ════════════════════════════════════════════════════════════════════════════
 const API_ROOT = (typeof window !== "undefined" && window.SUMMIT_API) || "http://localhost:8080";
 const API_BASE = `${API_ROOT}/v1`;
+// Is a real backend explicitly configured (vs the localhost default)?
+const API_CONFIGURED = typeof window !== "undefined" && !!window.SUMMIT_API;
 let _token = null;
 let _apiAlive = null; // null=unknown, true/false once probed
 
-const probeApi = async () => {
-  if (_apiAlive !== null) return _apiAlive;
+const probeApi = async (force = false) => {
+  if (_apiAlive !== null && !force) return _apiAlive;
   try {
-    const res = await fetch(`${API_ROOT}/health`, { signal: AbortSignal.timeout(1500) });
+    const res = await fetch(`${API_ROOT}/health`, { signal: AbortSignal.timeout(4000) });
     _apiAlive = res.ok;
   } catch { _apiAlive = false; }
   return _apiAlive;
@@ -320,7 +325,33 @@ const backend = {
   unlikePost: (id) => apiCall("DELETE", `/feed/posts/${id}/like`),
   listComments: async (id) => (await apiCall("GET", `/feed/posts/${id}/comments`)).items || [],
   addComment: (id, body) => apiCall("POST", `/feed/posts/${id}/comments`, { body }),
+
+  // ── Users / social graph ──
+  async searchUsers(q) {
+    const d = await apiCall("GET", `/community/users?q=${encodeURIComponent(q)}`);
+    return (d.items || d.users || []).map(u => ({
+      id: u.id, username: u.username, display_name: u.display_name || u.username,
+      bio: u.bio || "", following: !!u.is_following,
+    }));
+  },
+  followUser: (id) => apiCall("POST", `/community/follow/${id}`),
+  unfollowUser: (id) => apiCall("DELETE", `/community/follow/${id}`),
+  updateProfile: (body) => apiCall("PATCH", "/users/me", body),
 };
+
+// Demo user directory for offline search (used when no backend is connected)
+const DEMO_USERS = [
+  { id:"u1", username:"alexk",   display_name:"Alex K",   bio:"Cascades peak-bagger · 124km this month" },
+  { id:"u2", username:"mayar",   display_name:"Maya R",   bio:"Trail runner & photographer" },
+  { id:"u3", username:"jordant", display_name:"Jordan T", bio:"Weekend warrior, PNW" },
+  { id:"u4", username:"priyam",  display_name:"Priya M",  bio:"Thru-hiker · PCT '23" },
+  { id:"u5", username:"bent",    display_name:"Ben T",    bio:"Alpine scrambles & ski tours" },
+  { id:"u6", username:"ninap",   display_name:"Nina P",   bio:"Backcountry overnights" },
+  { id:"u7", username:"samb",    display_name:"Sam B",    bio:"Map nerd, gear tinkerer" },
+  { id:"u8", username:"chloed",  display_name:"Chloe D",  bio:"Volcano circuits, OR & WA" },
+  { id:"u9", username:"marcusl", display_name:"Marcus L", bio:"Ultralight enthusiast" },
+  { id:"u10",username:"tinaw",   display_name:"Tina W",   bio:"Family-friendly day hikes" },
+];
 
 // ════════════════════════════════════════════════════════════════════════════
 //  LOCAL STORE (in-memory fallback) + React context
@@ -329,11 +360,11 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 
 const SEED = {
   routes: [
-    { id:"r1", name:"Enchantments Loop", loc:"Leavenworth, WA", dist:26.4, gain:1820, diff:"expert",   icon:"⛰", rating:4.9, saves:2341, time:"9-12h" },
-    { id:"r2", name:"Lake Serene",       loc:"Index, WA",        dist:13.2, gain:1158, diff:"hard",     icon:"🏔", rating:4.8, saves:1876, time:"5-7h"  },
-    { id:"r3", name:"Rattlesnake Ledge", loc:"North Bend, WA",   dist:7.1,  gain:396,  diff:"moderate", icon:"🦅", rating:4.6, saves:5210, time:"2-3h"  },
-    { id:"r4", name:"Franklin Falls",    loc:"Snoqualmie, WA",   dist:3.2,  gain:61,   diff:"easy",     icon:"💧", rating:4.5, saves:8900, time:"1h"    },
-    { id:"r5", name:"Mt Si Summit",      loc:"North Bend, WA",   dist:14.4, gain:1256, diff:"hard",     icon:"🗻", rating:4.7, saves:3102, time:"5-8h"  },
+    { id:"r1", name:"Enchantments Loop", loc:"Leavenworth, WA", dist:26.4, gain:1820, diff:"expert",   icon:"⛰", rating:4.9, saves:2341, time:"9-12h", track:synthTrack(1820,[47.4762,-120.7860]) },
+    { id:"r2", name:"Lake Serene",       loc:"Index, WA",        dist:13.2, gain:1158, diff:"hard",     icon:"🏔", rating:4.8, saves:1876, time:"5-7h",  track:synthTrack(1158,[47.8092,-121.5730]) },
+    { id:"r3", name:"Rattlesnake Ledge", loc:"North Bend, WA",   dist:7.1,  gain:396,  diff:"moderate", icon:"🦅", rating:4.6, saves:5210, time:"2-3h",  track:synthTrack(396,[47.4346,-121.7680]) },
+    { id:"r4", name:"Franklin Falls",    loc:"Snoqualmie, WA",   dist:3.2,  gain:61,   diff:"easy",     icon:"💧", rating:4.5, saves:8900, time:"1h",    track:synthTrack(61,[47.4140,-121.4430]) },
+    { id:"r5", name:"Mt Si Summit",      loc:"North Bend, WA",   dist:14.4, gain:1256, diff:"hard",     icon:"🗻", rating:4.7, saves:3102, time:"5-8h",  track:synthTrack(1256,[47.4880,-121.7230]) },
   ],
   trips: [
     { id:"t1", name:"Enchantments Traverse",   date:"Oct 14–16, 2024", dist:26.4, gain:1820, dur:"3 days", status:"completed", color:T.gBright,
@@ -355,9 +386,9 @@ const SEED = {
     { id:"rp3", user:"Ben T",   time:"1d ago", cond:"fair",      msg:"Blowdown across trail at 3mi. Passable but slow.",                  route:"Mt Si",        rating:3 },
   ],
   posts: [
-    { id:"p1", kind:"photo", media_url:"", caption:"Golden hour at Colchuck Lake — worth the 4am start", location_name:"Enchantments", like_count:142, comment_count:8, liked:false, author:{ display_name:"Alex K", username:"alexk" }, created_at:"2h ago", grad:["#1e3a5f","#0d2818"] },
-    { id:"p2", kind:"video", media_url:"", duration_s:34, caption:"Ridgeline traverse in the clouds ☁️", location_name:"Mt Si", like_count:89, comment_count:3, liked:true, author:{ display_name:"Maya R", username:"mayar" }, created_at:"5h ago", grad:["#3a2f5f","#0d1828"] },
-    { id:"p3", kind:"photo", media_url:"", caption:"First snow of the season up high", location_name:"Lake Serene", like_count:204, comment_count:15, liked:false, author:{ display_name:"Jordan T", username:"jordant" }, created_at:"1d ago", grad:["#4a5060","#0d2818"] },
+    { id:"p1", kind:"photo", media_url:"", caption:"Golden hour at Colchuck Lake — worth the 4am start", location_name:"Enchantments", like_count:142, comment_count:8, liked:false, following:false, author:{ display_name:"Alex K", username:"alexk" }, created_at:"2h ago", grad:["#1e3a5f","#0d2818"] },
+    { id:"p2", kind:"video", media_url:"", duration_s:34, caption:"Ridgeline traverse in the clouds ☁️", location_name:"Mt Si", like_count:89, comment_count:3, liked:true, following:true, author:{ display_name:"Maya R", username:"mayar" }, created_at:"5h ago", grad:["#3a2f5f","#0d1828"] },
+    { id:"p3", kind:"photo", media_url:"", caption:"First snow of the season up high", location_name:"Lake Serene", like_count:204, comment_count:15, liked:false, following:true, author:{ display_name:"Jordan T", username:"jordant" }, created_at:"1d ago", grad:["#4a5060","#0d2818"] },
   ],
 };
 
@@ -370,13 +401,21 @@ const StoreProvider = ({ children }) => {
   const [gear, setGear]     = useState(SEED.gear);
   const [reports, setReports] = useState(SEED.reports);
   const [posts, setPosts]   = useState(SEED.posts);
+  const [following, setFollowing] = useState([
+    { id:"u2", username:"mayar",   display_name:"Maya R" },
+    { id:"u3", username:"jordant", display_name:"Jordan T" },
+    { id:"u4", username:"priyam",  display_name:"Priya M" },
+    { id:"u7", username:"samb",    display_name:"Sam B" },
+  ]);
   const [activeTrip, setActiveTrip] = useState(null);
   const [toasts, setToasts] = useState([]);
   const [online, setOnline] = useState(false);
+  const [activity, setActivity] = useState([]);   // audit trail for admin
 
   const toast = useCallback((msg, kind = "ok") => {
     const id = uid();
     setToasts(t => [...t, { id, msg, kind }]);
+    setActivity(a => [{ id, msg, kind, at: new Date().toISOString() }, ...a].slice(0, 200));
     setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), 3200);
   }, []);
 
@@ -384,7 +423,10 @@ const StoreProvider = ({ children }) => {
   const hydrate = useCallback(async () => {
     const alive = await probeApi();
     setOnline(alive);
-    if (!alive) { toast("Backend offline — demo mode", "warn"); return; }
+    if (!alive) {
+      toast(API_CONFIGURED ? "Backend unreachable — demo mode" : "No backend set — demo mode", "warn");
+      return;
+    }
     try {
       const [rs, gs, ts] = await Promise.all([
         backend.listRoutes().catch(() => null),
@@ -397,7 +439,7 @@ const StoreProvider = ({ children }) => {
         setTrips(ts);
         setActiveTrip(ts.find(t => t.status === "active") || null);
       }
-      toast("Synced with server ✓");
+      toast("Live data synced ✓");
     } catch (e) { toast(`Sync failed: ${e.message}`, "warn"); }
   }, [toast]);
 
@@ -440,6 +482,30 @@ ${trkpts}
     a.href = url; a.download = `${route.name.replace(/[^a-z0-9]/gi, "_")}.gpx`;
     a.click(); URL.revokeObjectURL(url);
     toast(`Exported ${route.name}.gpx`);
+  }, [toast]);
+
+  // Download a markdown trip/route report
+  const exportReport = useCallback((t) => {
+    const lines = [
+      `# ${t.name}`,
+      ``,
+      `- Date: ${t.date || "—"}`,
+      `- Distance: ${t.dist ?? "—"} km`,
+      `- Elevation gain: ${(t.gain||0).toLocaleString()} m`,
+      `- Duration: ${t.dur || "—"}`,
+      `- Status: ${t.status || "—"}`,
+      ``,
+      `## Journal`,
+      ...((t.journal||[]).length ? t.journal.map(e => `- ${e}`) : ["_No entries._"]),
+      ``,
+      `_Generated by Summit · Powered by Daie DillyAI Enterprise_`,
+    ].join("\n");
+    const blob = new Blob([lines], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `${(t.name||"trip").replace(/[^a-z0-9]/gi,"_")}_report.md`;
+    a.click(); URL.revokeObjectURL(url);
+    toast(`Report exported ✓`);
   }, [toast]);
 
   // ── Trip ops ──
@@ -531,12 +597,53 @@ ${trkpts}
     toast("Post deleted");
   }, [online, toast]);
 
+  // Replace the whole feed list (used when server returns scoped results)
+  const setFeedPosts = useCallback((list) => {
+    setPosts(list.map(p => ({ liked:false, like_count:0, comment_count:0, ...p })));
+  }, []);
+  // Bump a post's comment count after a comment is added
+  const bumpComments = useCallback((id, by=1) => {
+    setPosts(ps => ps.map(p => p.id===id ? { ...p, comment_count:(p.comment_count||0)+by } : p));
+  }, []);
+
+  // ── User search & follow graph ──
+  const isFollowing = useCallback((u) => following.some(f => f.id === u.id || f.username === u.username), [following]);
+  const searchUsers = useCallback(async (q) => {
+    const query = (q||"").trim();
+    if (!query) return [];
+    let results = [];
+    if (online) {
+      try { results = await backend.searchUsers(query); } catch { results = []; }
+    }
+    if (!results.length) {
+      const lq = query.toLowerCase();
+      results = DEMO_USERS.filter(u =>
+        u.display_name.toLowerCase().includes(lq) || u.username.toLowerCase().includes(lq));
+    }
+    // annotate with current follow state
+    return results.map(u => ({ ...u, following: isFollowing(u) }));
+  }, [online, isFollowing]);
+
+  const followUser = useCallback(async (u) => {
+    if (isFollowing(u)) return;
+    setFollowing(f => [...f, { id:u.id, username:u.username, display_name:u.display_name }]);
+    toast(`Following ${u.display_name} ✓`);
+    if (online) { try { await backend.followUser(u.id); } catch {} }
+  }, [online, toast, isFollowing]);
+
+  const unfollowUser = useCallback(async (u) => {
+    setFollowing(f => f.filter(x => x.id !== u.id && x.username !== u.username));
+    toast(`Unfollowed ${u.display_name}`);
+    if (online) { try { await backend.unfollowUser(u.id); } catch {} }
+  }, [online, toast]);
+
   const value = {
-    routes, trips, gear, reports, posts, activeTrip, toasts, toast, online, hydrate,
-    addRoute, deleteRoute, exportGpx,
+    routes, trips, gear, reports, posts, following, activeTrip, toasts, toast, online, hydrate, activity,
+    addRoute, deleteRoute, exportGpx, exportReport,
     startTrip, endTrip, addJournal,
     addGear, deleteGear, addReport,
-    createPost, toggleLike, deletePost,
+    createPost, toggleLike, deletePost, setFeedPosts, bumpComments,
+    searchUsers, followUser, unfollowUser, isFollowing,
   };
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>;
 };
@@ -636,6 +743,113 @@ const ElevChart = ({color=T.gBright,data,height=80,showGrid}) => {
 const DCOL={easy:"g",moderate:"a",hard:"r",expert:"p",extreme:"r"};
 const CCOL={new:"g",excellent:"g",good:"a",fair:"r",poor:"r",retired:"s"};
 
+// Representative coordinate for a route (midpoint of track, else default).
+const routeCoord = (route) => {
+  const t = route?.track || route?.track_points;
+  if (Array.isArray(t) && t.length) {
+    const m = t[Math.floor(t.length/2)] || t[0];
+    const lat = m?.lat, lon = m?.lon ?? m?.lng;
+    if (typeof lat === "number" && typeof lon === "number") return [lat, lon];
+  }
+  return [46.8523, -121.7603]; // Mt Rainier fallback
+};
+
+// ── Weather (Open-Meteo, no API key) ──
+const _weatherCache = {};
+// WMO weather interpretation codes → icon + label
+const WMO = (c) => {
+  if (c===0) return ["☀️","Clear"];
+  if (c<=2) return ["🌤️","Partly cloudy"];
+  if (c===3) return ["☁️","Overcast"];
+  if (c<=48) return ["🌫️","Fog"];
+  if (c<=57) return ["🌦️","Drizzle"];
+  if (c<=67) return ["🌧️","Rain"];
+  if (c<=77) return ["❄️","Snow"];
+  if (c<=82) return ["🌧️","Showers"];
+  if (c<=86) return ["🌨️","Snow showers"];
+  if (c<=99) return ["⛈️","Thunderstorm"];
+  return ["🌡️","—"];
+};
+const WeatherWidget = ({ route, lat: latProp, lon: lonProp, compact }) => {
+  const [la, lo] = route ? routeCoord(route) : [latProp, lonProp];
+  const [data, setData] = useState(null);
+  const [state, setState] = useState("loading"); // loading | ok | error
+  useEffect(() => {
+    if (la == null || lo == null) { setState("error"); return; }
+    const lat = la, lon = lo;
+    const key = `${lat.toFixed(3)},${lon.toFixed(3)}`;
+    if (_weatherCache[key]) { setData(_weatherCache[key]); setState("ok"); return; }
+    let cancel = false;
+    setState("loading");
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`
+      + `&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,precipitation`
+      + `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max`
+      + `&timezone=auto&forecast_days=3&temperature_unit=celsius&wind_speed_unit=kmh`;
+    fetch(url, { signal: AbortSignal.timeout(6000) })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error("weather")))
+      .then(j => { if (cancel) return; _weatherCache[key] = j; setData(j); setState("ok"); })
+      .catch(() => { if (!cancel) setState("error"); });
+    return () => { cancel = true; };
+  }, [la, lo]);
+
+  if (state === "error") {
+    return <div style={{ fontSize:11, color:T.txtF, padding:"8px 0" }}>Weather unavailable for this location.</div>;
+  }
+  if (state === "loading" || !data) {
+    return <Row g={8} style={{ padding:"8px 0", color:T.txtF, fontSize:12 }}><Spin s={14}/> Loading forecast…</Row>;
+  }
+  const cur = data.current || {};
+  const [icon, label] = WMO(cur.weather_code);
+  const daily = data.daily || {};
+  const days = (daily.time || []).map((t, i) => ({
+    date: new Date(t).toLocaleDateString([], { weekday: "short" }),
+    code: daily.weather_code?.[i], hi: daily.temperature_2m_max?.[i], lo: daily.temperature_2m_min?.[i],
+    pop: daily.precipitation_probability_max?.[i], wind: daily.weather_code && daily.wind_speed_10m_max?.[i],
+  }));
+  // hazard checks
+  const hazards = [];
+  if (cur.wind_speed_10m > 40) hazards.push("High winds");
+  if ((daily.precipitation_probability_max?.[0] ?? 0) > 70) hazards.push("Likely precipitation");
+  if ([95,96,99].includes(cur.weather_code)) hazards.push("Thunderstorms");
+  if ((daily.temperature_2m_min?.[0] ?? 99) < 0) hazards.push("Freezing temps");
+  if ([71,73,75,77,85,86].includes(cur.weather_code)) hazards.push("Snow");
+
+  return (
+    <div>
+      <Row style={{ justifyContent:"space-between", alignItems:"center", marginBottom:compact?0:10 }}>
+        <Row g={10}>
+          <span style={{ fontSize:30 }}>{icon}</span>
+          <div>
+            <div style={{ fontFamily:"Fraunces,serif", fontSize:22, fontWeight:700 }}>{Math.round(cur.temperature_2m)}°C</div>
+            <div style={{ fontSize:11, color:T.txtD }}>{label} · feels {Math.round(cur.apparent_temperature)}°</div>
+          </div>
+        </Row>
+        <div style={{ textAlign:"right", fontSize:11, color:T.txtD }}>
+          <div>💨 {Math.round(cur.wind_speed_10m)} km/h</div>
+          <div>💧 {cur.precipitation ?? 0} mm</div>
+        </div>
+      </Row>
+      {hazards.length>0 && (
+        <div style={{ background:`${T.red}14`, border:`1px solid ${T.red}44`, borderRadius:8, padding:"7px 11px", margin:"4px 0 10px", fontSize:11, color:T.red }}>
+          ⚠ {hazards.join(" · ")}
+        </div>
+      )}
+      {!compact && (
+        <Row g={8}>
+          {days.map((d,i) => { const [di] = WMO(d.code); return (
+            <div key={i} style={{ flex:1, background:T.bgEl, borderRadius:9, padding:"9px 6px", textAlign:"center" }}>
+              <div style={{ fontSize:10, color:T.txtD, marginBottom:3 }}>{i===0?"Today":d.date}</div>
+              <div style={{ fontSize:20 }}>{di}</div>
+              <div style={{ fontSize:12, fontWeight:600, marginTop:2 }}>{Math.round(d.hi)}°<span style={{ color:T.txtF, fontWeight:400 }}>/{Math.round(d.lo)}°</span></div>
+              {d.pop!=null && <div style={{ fontSize:10, color:d.pop>60?T.bluL:T.txtF, marginTop:2 }}>💧{d.pop}%</div>}
+            </div>
+          );})}
+        </Row>
+      )}
+    </div>
+  );
+};
+
 // ════════════════════════════════════════════════════════════════════════════
 //  3D TRAIL VIEWER
 // ════════════════════════════════════════════════════════════════════════════
@@ -649,11 +863,13 @@ const Trail3D = ({ route }) => {
     let renderer;
     try {
       renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+      if(!renderer || !renderer.getContext()) throw new Error("no-gl");
     } catch(e) { setFailed(true); return; }
     // Fallback dims if the flex parent hasn't laid out yet (avoids 0x0 canvas → blank view)
     let W=el.clientWidth||el.offsetWidth||800, H=el.clientHeight||el.offsetHeight||600;
     renderer.setSize(W,H); renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
     renderer.domElement.style.display="block";
+    renderer.domElement.style.width="100%"; renderer.domElement.style.height="100%";
     renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.1;
     el.appendChild(renderer.domElement);
     const scene=new THREE.Scene();
@@ -786,41 +1002,134 @@ const Trail3D = ({ route }) => {
 // ════════════════════════════════════════════════════════════════════════════
 //  2D TOPO MAP — with working zoom
 // ════════════════════════════════════════════════════════════════════════════
-const TopoMap2D = () => {
-  const [hov,setHov]=useState(null);
-  const [zoom,setZoom]=useState(1);
-  const [layer,setLayer]=useState("Topo");
-  const cs=Array.from({length:22},(_,i)=>{const r=50+i*26,cx=440,cy=320,s=i*1.7;const w=n=>Math.sin(n)*30+Math.cos(n*1.4)*20;
-    return `M${cx+r+w(s)},${cy} C${cx+r*.7+w(s+1)},${cy-r+w(s+2)} ${cx+w(s+3)},${cy-r*1.1+w(s+4)} ${cx-r+w(s+5)},${cy} C${cx-r*.7+w(s+6)},${cy+r+w(s+7)} ${cx+w(s+8)},${cy+r*1.1+w(s+9)} ${cx+r+w(s)},${cy} Z`;});
-  const track="M70,500 C110,460 180,415 250,380 S360,345 420,320 S500,302 560,294 S640,290 700,295 S770,308 840,330";
-  const wpts=[[70,500,T.gBright,"▶ TH","s"],[440,320,T.ambL,"⛰ Summit","sum"],[840,330,T.red,"■ End","e"],[590,332,T.bluL,"💧 Spring","w"]];
-  const layerBg={Topo:T.bg,Satellite:"#0a1418",Trail:"#0d1812"};
-  return(
-    <div style={{width:"100%",height:"100%",background:layerBg[layer],position:"relative",overflow:"hidden"}}>
-      <svg style={{position:"absolute",inset:0,width:"100%",height:"100%",transition:"transform .3s ease",transform:`scale(${zoom})`}} viewBox="0 0 940 640" preserveAspectRatio="xMidYMid slice">
-        {layer!=="Satellite"&&cs.map((d,i)=><path key={i} d={d} fill="none" stroke={T.gBright} strokeWidth={i%5===0?1.3:.6} opacity={.04+i*.012}/>)}
-        {layer==="Satellite"&&cs.map((d,i)=><path key={i} d={d} fill={i%2?"#0f1a14":"#0c1610"} stroke="none" opacity={.5}/>)}
-        <path d="M0,180 Q200,155 380,185 T760,170 T940,180" fill="none" stroke="#4a9fd4" strokeWidth="1.5" opacity=".22"/>
-        <defs><filter id="tg"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
-        <path d={track} fill="none" stroke={T.gBright} strokeWidth="3" filter="url(#tg)" strokeLinecap="round"/>
-        <path d={track} fill="none" stroke={T.gBright} strokeWidth="1.5" opacity=".4" strokeDasharray="7 14"/>
-        {wpts.map(([x,y,c,l,k])=>(<g key={k} style={{cursor:"pointer"}} onMouseEnter={()=>setHov(k)} onMouseLeave={()=>setHov(null)}>
-          <circle cx={x} cy={y} r="11" fill={c} opacity=".18"/><circle cx={x} cy={y} r="5" fill={c} style={{filter:`drop-shadow(0 0 6px ${c})`}}/>
-          {hov===k&&<g><rect x={x-42} y={y-36} width="84" height="22" rx="5" fill={T.bgCard} stroke={c} strokeWidth="1"/><text x={x} y={y-20} textAnchor="middle" fill={c} fontSize="10" fontFamily="JetBrains Mono">{l}</text></g>}
-        </g>))}
-      </svg>
-      <div style={{position:"absolute",top:16,left:16,background:`${T.bgCard}ee`,backdropFilter:"blur(12px)",border:`1px solid ${T.brd}`,borderRadius:10,padding:"10px 14px"}}>
-        <div style={{fontSize:10,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:3}}>Active Track</div>
-        <div style={{fontFamily:"Fraunces,serif",fontSize:21,fontWeight:700,color:T.gGlow}}>13.2 km</div>
-        <div style={{fontSize:11,color:T.txtD}}>↑ 1,158m · Est. 5–7h</div>
+// ── Leaflet loader (CDN, no key). Resolves once window.L is ready. ──
+let _leafletPromise = null;
+const loadLeaflet = () => {
+  if (typeof window !== "undefined" && window.L) return Promise.resolve(window.L);
+  if (_leafletPromise) return _leafletPromise;
+  _leafletPromise = new Promise((resolve, reject) => {
+    const css = document.createElement("link");
+    css.rel = "stylesheet";
+    css.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
+    document.head.appendChild(css);
+    const js = document.createElement("script");
+    js.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
+    js.onload = () => resolve(window.L);
+    js.onerror = () => reject(new Error("leaflet-load-failed"));
+    document.head.appendChild(js);
+  });
+  return _leafletPromise;
+};
+
+// Esri / ArcGIS basemap tile services — free, no API key required.
+const ESRI_BASEMAPS = {
+  Topographic: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+    attr: "Tiles © Esri — Esri, DeLorme, NAVTEQ, USGS, NPS",
+  },
+  Imagery: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attr: "Tiles © Esri — Source: Esri, Maxar, Earthstar Geographics, USDA, USGS",
+  },
+  Terrain: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}",
+    attr: "Tiles © Esri — Source: Esri, USGS, NOAA",
+  },
+};
+
+const TopoMap2D = ({ route }) => {
+  const elRef = useRef(null);
+  const mapRef = useRef(null);
+  const layerRef = useRef(null);   // current basemap tile layer
+  const trackRef = useRef(null);   // route overlay group
+  const [layer, setLayer] = useState("Topographic");
+  const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  // Derive track coords (real or a gentle synthetic line near the route seed)
+  const coords = (() => {
+    const t = route?.track || route?.track_points;
+    if (Array.isArray(t) && t.length > 1) return t.map(p => [p.lat, p.lon ?? p.lng]).filter(c => typeof c[0]==="number" && typeof c[1]==="number");
+    return null;
+  })();
+
+  // Init the map once
+  useEffect(() => {
+    let cancelled = false;
+    // If Leaflet/tiles don't load within 8s (e.g. CDN blocked), show fallback.
+    const failTimer = setTimeout(() => { if (!cancelled && !mapRef.current) setFailed(true); }, 8000);
+    loadLeaflet().then((L) => {
+      if (cancelled || !elRef.current || mapRef.current) return;
+      const center = coords ? coords[Math.floor(coords.length/2)] : [46.8523, -121.7603]; // Mt Rainier default
+      const map = L.map(elRef.current, { zoomControl: false, attributionControl: true }).setView(center, 12);
+      L.control.zoom({ position: "bottomright" }).addTo(map);
+      const bm = ESRI_BASEMAPS[layer];
+      layerRef.current = L.tileLayer(bm.url, { attribution: bm.attr, maxZoom: 19 }).addTo(map);
+      mapRef.current = map;
+      setReady(true);
+      clearTimeout(failTimer);
+      // Re-measure several times as the flex/grid layout settles (fixes blank/0-size map)
+      [60, 200, 500, 900].forEach(ms => setTimeout(() => { try { map.invalidateSize(); } catch {} }, ms));
+    }).catch(() => { if (!cancelled) setFailed(true); });
+    return () => { cancelled = true; clearTimeout(failTimer); if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
+  // eslint-disable-next-line
+  }, []);
+
+  // Keep the map sized to its container (handles 2D/3D toggle + viewport changes)
+  useEffect(() => {
+    const map = mapRef.current, el = elRef.current; if (!map || !el || !ready) return;
+    const ro = new ResizeObserver(() => { try { map.invalidateSize(); } catch {} });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ready]);
+
+  // Swap basemap when layer changes
+  useEffect(() => {
+    const L = window.L, map = mapRef.current; if (!L || !map) return;
+    if (layerRef.current) map.removeLayer(layerRef.current);
+    const bm = ESRI_BASEMAPS[layer];
+    layerRef.current = L.tileLayer(bm.url, { attribution: bm.attr, maxZoom: 19 }).addTo(map);
+  }, [layer, ready]);
+
+  // Draw / update the route track
+  useEffect(() => {
+    const L = window.L, map = mapRef.current; if (!L || !map) return;
+    if (trackRef.current) { map.removeLayer(trackRef.current); trackRef.current = null; }
+    if (!coords) return;
+    const grp = L.layerGroup();
+    L.polyline(coords, { color: "#1b3a2a", weight: 7, opacity: 0.5, lineCap: "round" }).addTo(grp); // shadow
+    L.polyline(coords, { color: "#4db8ff", weight: 4, opacity: 0.95, lineCap: "round" }).addTo(grp); // bright blue route
+    const mk = (latlng, color, label) => L.circleMarker(latlng, { radius: 7, color: "#fff", weight: 2, fillColor: color, fillOpacity: 1 }).bindTooltip(label, { direction: "top" });
+    mk(coords[0], "#2fbf6c", "Trailhead").addTo(grp);
+    mk(coords[coords.length - 1], "#E8763A", "Summit / End").addTo(grp);
+    grp.addTo(map);
+    trackRef.current = grp;
+    map.fitBounds(L.latLngBounds(coords).pad(0.25));
+  }, [route, ready]);
+
+  if (failed) {
+    // Network/CDN blocked → keep a usable styled fallback
+    return (
+      <div style={{ width:"100%", height:"100%", background:T.bg, display:"flex", alignItems:"center", justifyContent:"center", flexDirection:"column", gap:8, color:T.txtD }}>
+        <div style={{ fontSize:13 }}>Map tiles unavailable (offline or blocked).</div>
+        <div style={{ fontSize:11 }}>Route data is still loaded — connect to load Esri basemaps.</div>
       </div>
-      <div style={{position:"absolute",bottom:14,right:14,display:"flex",flexDirection:"column",gap:4}}>
-        <button onClick={()=>setZoom(z=>Math.min(2.5,z+.25))} style={mapBtn}>+</button>
-        <button onClick={()=>setZoom(z=>Math.max(1,z-.25))} style={mapBtn}>−</button>
-        <button onClick={()=>setZoom(1)} style={mapBtn}>⊕</button>
-      </div>
-      <div style={{position:"absolute",bottom:14,left:"50%",transform:"translateX(-50%)",display:"flex",gap:5}}>
-        {["Topo","Satellite","Trail"].map(l=><button key={l} onClick={()=>setLayer(l)} style={{height:26,padding:"0 11px",background:layer===l?`${T.gMid}44`:`${T.bgCard}cc`,backdropFilter:"blur(8px)",border:`1px solid ${layer===l?T.gBright:T.brd}`,borderRadius:6,color:layer===l?T.gBright:T.txtD,fontSize:11,fontFamily:"JetBrains Mono",cursor:"pointer"}}>{l}</button>)}
+    );
+  }
+
+  return (
+    <div style={{ width:"100%", height:"100%", position:"relative" }}>
+      <div ref={elRef} style={{ position:"absolute", inset:0, background:T.bg }} />
+      {!ready && (
+        <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", color:T.txtD, fontSize:12, pointerEvents:"none" }}>
+          Loading Esri basemap…
+        </div>
+      )}
+      {/* basemap switcher — bottom-left, clear of the top-right 2D/3D toggle */}
+      <div style={{ position:"absolute", bottom:14, left:14, zIndex:500, display:"flex", gap:4, maxWidth:"calc(100% - 28px)", overflowX:"auto", background:`${T.bgCard}dd`, backdropFilter:"blur(8px)", border:`1px solid ${T.brd}`, borderRadius:8, padding:4 }}>
+        {Object.keys(ESRI_BASEMAPS).map(l => (
+          <button key={l} onClick={()=>setLayer(l)} style={{ height:26, padding:"0 10px", flexShrink:0, background:layer===l?`${T.gMid}44`:"transparent", border:`1px solid ${layer===l?T.gBright:"transparent"}`, borderRadius:6, color:layer===l?T.gBright:T.txtD, fontSize:11, fontFamily:"'Spline Sans Mono',monospace", cursor:"pointer", whiteSpace:"nowrap" }}>{l}</button>
+        ))}
       </div>
     </div>
   );
@@ -905,6 +1214,59 @@ const StartTripModal = ({ onClose, prefill }) => {
   );
 };
 
+const FindPeopleModal = ({ onClose }) => {
+  const { searchUsers, followUser, unfollowUser, isFollowing } = useStore();
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [touched, setTouched] = useState(false);
+  // debounce search as the user types
+  useEffect(() => {
+    if (!q.trim()) { setResults([]); setTouched(false); return; }
+    setTouched(true); setLoading(true);
+    const t = setTimeout(async () => {
+      const r = await searchUsers(q);
+      setResults(r); setLoading(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q, searchUsers]);
+  // re-evaluate follow state after toggling
+  const [, force] = useState(0);
+  const toggle = async (u) => {
+    if (isFollowing(u)) await unfollowUser(u); else await followUser(u);
+    setResults(rs => rs.map(x => x.id===u.id ? { ...x, following: !isFollowing(u) } : x));
+    force(n => n+1);
+  };
+  return (
+    <Modal title="Find People" onClose={onClose}>
+      <Col g={14}>
+        <input autoFocus placeholder="Search by name or username…" value={q} onChange={e=>setQ(e.target.value)} style={{ width:"100%" }}/>
+        <div style={{ minHeight:120, maxHeight:340, overflowY:"auto", display:"flex", flexDirection:"column", gap:8 }}>
+          {loading && <div style={{ fontSize:12, color:T.txtF, padding:"8px 2px" }}>Searching…</div>}
+          {!loading && touched && results.length===0 && <div style={{ fontSize:12, color:T.txtF, padding:"8px 2px" }}>No people found for “{q}”.</div>}
+          {!touched && <div style={{ fontSize:12, color:T.txtF, padding:"8px 2px" }}>Start typing to find hikers to follow.</div>}
+          {results.map(u => {
+            const fol = isFollowing(u);
+            return (
+              <Row key={u.id} style={{ justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${T.brd}` }}>
+                <Row g={11} style={{ minWidth:0 }}>
+                  <div style={{ width:38,height:38,borderRadius:"50%",background:`linear-gradient(135deg,${T.gMid},${T.ambL})`,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,flexShrink:0,fontFamily:"Fraunces,serif" }}>{u.display_name.charAt(0)}</div>
+                  <div style={{ minWidth:0 }}>
+                    <div style={{ fontSize:13,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{u.display_name} <span style={{ color:T.txtF,fontWeight:400 }}>@{u.username}</span></div>
+                    {u.bio && <div style={{ fontSize:11,color:T.txtD,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{u.bio}</div>}
+                  </div>
+                </Row>
+                <Btn v={fol?"ghost":"pri"} sz="sm" onClick={()=>toggle(u)}>{fol?"Following":"Follow"}</Btn>
+              </Row>
+            );
+          })}
+        </div>
+        <Btn v="ghost" onClick={onClose}>Done</Btn>
+      </Col>
+    </Modal>
+  );
+};
+
 const AddReportModal = ({ onClose }) => {
   const { addReport, routes } = useStore();
   const [f,setF]=useState({route:routes[0]?.name||"",cond:"good",msg:"",rating:4});
@@ -973,6 +1335,15 @@ const LiveTracking = () => {
   },[activeTrip]);
 
   const fmt=s=>`${String(Math.floor(s/3600)).padStart(2,"0")}:${String(Math.floor(s%3600/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+  const shareLocation=()=>{
+    if(!navigator.geolocation){ toast("Geolocation not supported","warn"); return; }
+    toast("Getting your location…");
+    navigator.geolocation.getCurrentPosition(
+      pos=>{ const {latitude,longitude}=pos.coords; toast(`Location shared: ${latitude.toFixed(4)}, ${longitude.toFixed(4)} ✓`); },
+      ()=>toast("Location permission denied","warn"),
+      { enableHighAccuracy:true, timeout:8000 }
+    );
+  };
   const friends=[{name:"Maya K",pos:"2.1km ahead",color:T.ambL,status:"active"},{name:"Jordan T",pos:"0.4km behind",color:T.bluL,status:"active"},{name:"Sam R",pos:"At trailhead",color:T.sMed,status:"waiting"}];
 
   const finish=()=>{
@@ -1007,7 +1378,7 @@ const LiveTracking = () => {
           <div style={{width:8,height:8,borderRadius:"50%",background:f.status==="active"?T.gBright:T.sDim,boxShadow:f.status==="active"?`0 0 8px ${T.gBright}`:undefined}}/>
         </Row>))}
         <Row g={8} style={{marginTop:14}}>
-          <Btn v="subtle" style={{flex:1}} onClick={()=>toast("Location shared with group")} ic={<span style={{fontSize:12}}>📍</span>}>Share Location</Btn>
+          <Btn v="subtle" style={{flex:1}} onClick={shareLocation} ic={<span style={{fontSize:12}}>📍</span>}>Share Location</Btn>
           <Btn v="danger" onClick={()=>setShowSos(true)} ic={<span style={{fontSize:12}}>🆘</span>}>SOS</Btn>
         </Row>
       </div>
@@ -1107,7 +1478,7 @@ const Dashboard = ({ go }) => {
         </Col>
       </div>
       <div style={{textAlign:"center",padding:"8px 0 2px",fontFamily:"'Spline Sans Mono',monospace",fontSize:9.5,letterSpacing:"0.14em",textTransform:"uppercase",color:T.txtF}}>
-        Powered by Daie DillyAI Enterprise
+        Powered by Daie DillyAI Enterprise · {BUILD_VERSION}
       </div>
     </div>
   );
@@ -1155,6 +1526,10 @@ const Explore = ({ openNewRoute }) => {
                     <div key={l} style={{background:T.bgEl,borderRadius:8,padding:"9px 11px"}}><div style={{fontSize:9,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:2}}>{l}</div><div style={{fontFamily:"Fraunces,serif",fontSize:18,fontWeight:700}}>{v}</div></div>))}
                 </div>
                 <ElevChart color={T.ambL} height={52}/>
+                <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${T.brd}`}}>
+                  <div style={{fontSize:10,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Trail Weather</div>
+                  <WeatherWidget route={r}/>
+                </div>
                 <Col g={6} style={{marginTop:12}}>
                   <Row g={6}><Btn style={{flex:1}} onClick={()=>startTrip(r)}>Start Trip</Btn>
                     <Btn v={show3D?"active":"ghost"} onClick={()=>setShow3D(s=>!s)} ic={<span style={{fontSize:12}}>🏔</span>}>3D</Btn></Row>
@@ -1174,7 +1549,7 @@ const Explore = ({ openNewRoute }) => {
         </div>
       </div>
       <div style={{flex:1,position:"relative",overflow:"hidden",order:isMobile?1:2,minHeight:isMobile?240:0}}>
-        {show3D?<Trail3D route={view3D}/>:<TopoMap2D/>}
+        {show3D?<Trail3D route={view3D}/>:<TopoMap2D route={view3D}/>}
         <div style={{position:"absolute",top:14,right:14}}><Btn v={show3D?"active":"subtle"} sz="sm" onClick={()=>setShow3D(s=>!s)} ic={<span style={{fontSize:13}}>🏔</span>}>{show3D?"2D Map":"3D View"}</Btn></div>
       </div>
     </div>
@@ -1182,7 +1557,7 @@ const Explore = ({ openNewRoute }) => {
 };
 
 const Trips = ({ openStart }) => {
-  const { trips, exportGpx, toast } = useStore();
+  const { trips, exportGpx, exportReport, toast } = useStore();
   const { isMobile } = useTheme();
   const [sel,setSel]=useState(trips[0]);
   const [show3D,setShow3D]=useState(false);
@@ -1215,6 +1590,10 @@ const Trips = ({ openStart }) => {
             {[["Distance",sel.dist+"km"],["Duration",sel.dur],["Elev. Gain",sel.gain+"m"],["Date",sel.date]].map(([l,v])=>(
               <div key={l} style={{background:T.bgEl,borderRadius:9,padding:11}}><div style={{fontSize:9,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:2}}>{l}</div><div style={{fontFamily:"Fraunces,serif",fontSize:16,fontWeight:700}}>{v}</div></div>))}
           </div>
+          {sel.track&&<div style={{marginBottom:16,paddingBottom:14,borderBottom:`1px solid ${T.brd}`}}>
+            <div style={{fontSize:10,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Conditions</div>
+            <WeatherWidget route={sel} compact/>
+          </div>}
           <Row style={{justifyContent:"space-between",marginBottom:9}}>
             <div style={{fontSize:10,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.08em"}}>Journal</div>
             <Btn v="ghost" sz="xs" onClick={()=>setJournalFor(sel)} ic={<span style={{fontSize:10}}>＋</span>}>Add</Btn>
@@ -1223,17 +1602,30 @@ const Trips = ({ openStart }) => {
           {(sel.journal||[]).map((e,i)=>(<Row key={i} g={9} style={{marginBottom:9,alignItems:"flex-start"}}>
             <div style={{width:5,height:5,borderRadius:"50%",background:sel.color,marginTop:6,flexShrink:0,boxShadow:`0 0 5px ${sel.color}`}}/>
             <div style={{fontSize:12,color:T.txtD,lineHeight:1.55}}>{e}</div></Row>))}
-          <Row g={6} style={{marginTop:14}}><Btn style={{flex:1}} onClick={()=>toast("Opening full report…")}>Full Report</Btn><Btn v="ghost" onClick={()=>exportGpx({name:sel.name,gain:sel.gain})}>Export</Btn></Row>
+          <Row g={6} style={{marginTop:14}}><Btn style={{flex:1}} onClick={()=>exportReport(sel)}>Full Report</Btn><Btn v="ghost" onClick={()=>exportGpx({name:sel.name,gain:sel.gain,track:sel.track})}>Export</Btn></Row>
         </div>
       </Card>}
     </div>
   );
 };
 
+const LOADOUT_PRESETS = {
+  "Day Hike":      { target: 4000,  essentials:["Navigation","Footwear"],                              icon:"🥾" },
+  "Overnight":     { target: 8000,  essentials:["Shelter","Sleep","Pack","Footwear","Navigation"],     icon:"⛺" },
+  "Ultralight":    { target: 4500,  essentials:["Shelter","Sleep","Pack"],                              icon:"⚡" },
+  "Winter Alpine": { target: 12000, essentials:["Shelter","Sleep","Pack","Navigation","Electronics"],  icon:"🏔" },
+};
+const WORN_CATEGORIES = new Set(["Footwear"]);  // worn weight doesn't count toward base pack weight
+
 const Gear = ({ openAddGear }) => {
   const { gear, deleteGear } = useStore();
   const { isMobile } = useTheme();
   const [tab,setTab]=useState("inventory");
+  // Loadout state: which preset, and which gear ids are included
+  const [preset,setPreset]=useState("Overnight");
+  const [included,setIncluded]=useState(()=>new Set(gear.map(g=>g.id)));
+  const toggleItem=(id)=>setIncluded(s=>{const n=new Set(s); n.has(id)?n.delete(id):n.add(id); return n;});
+  const packGear=gear.filter(g=>included.has(g.id));
   const totalW=gear.reduce((s,g)=>s+(g.w||0),0);
   const totalCost=gear.reduce((s,g)=>s+(g.cost||0),0);
   const needsRepl=gear.filter(g=>g.life<25).length;
@@ -1261,49 +1653,133 @@ const Gear = ({ openAddGear }) => {
             </Card>))}
           </div>
         )}
-        {tab==="loadouts"&&(
+        {tab==="loadouts"&&(()=>{
+          const cfg=LOADOUT_PRESETS[preset];
+          const packW=packGear.reduce((s,g)=>s+(g.w||0),0);
+          const wornW=packGear.filter(g=>WORN_CATEGORIES.has(g.cat)).reduce((s,g)=>s+(g.w||0),0);
+          const baseW=packW-wornW;  // base weight = carried, excludes worn
+          const pct=Math.min(100,Math.round((packW/cfg.target)*100));
+          const overTarget=packW>cfg.target;
+          const wclass=baseW<4500?{l:"Ultralight",c:T.gBright}:baseW<7300?{l:"Lightweight",c:T.ambL}:{l:"Traditional",c:T.bluL};
+          const byCat=packGear.reduce((a,g)=>{a[g.cat]=(a[g.cat]||0)+g.w;return a;},{});
+          const packedCats=new Set(packGear.map(g=>g.cat));
+          const missing=cfg.essentials.filter(c=>!packedCats.has(c));
+          return(
           <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 340px",gap:isMobile?16:22}}>
-            <div><div style={{fontFamily:"Fraunces,serif",fontSize:20,fontWeight:700,marginBottom:18}}>Full Inventory Loadout</div>
-              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(auto-fill,minmax(220px,1fr))",gap:12}}>
-                {gear.map((g,i)=>(<Card key={g.id} style={{padding:14,animation:`fadeIn .35s ease ${i*.06}s both`}}><Row g={10}><span style={{fontSize:22}}>{g.ic}</span>
-                  <div><div style={{fontSize:12,fontWeight:500}}>{g.name}</div><div style={{fontSize:11,color:T.txtD}}>{g.w}g</div></div></Row></Card>))}
+            <div>
+              {/* preset selector */}
+              <Row g={8} style={{marginBottom:16,flexWrap:"wrap"}}>
+                {Object.entries(LOADOUT_PRESETS).map(([name,p])=>(
+                  <button key={name} onClick={()=>setPreset(name)} style={{display:"flex",alignItems:"center",gap:7,height:36,padding:"0 14px",borderRadius:10,border:`1px solid ${preset===name?T.gBright:T.brd}`,background:preset===name?`${T.gMid}22`:"transparent",color:preset===name?T.gBright:T.txtD,fontSize:13,cursor:"pointer",fontFamily:"inherit"}}>
+                    <span style={{fontSize:15}}>{p.icon}</span>{name}</button>))}
+              </Row>
+              <Row style={{justifyContent:"space-between",alignItems:"baseline",marginBottom:6}}>
+                <div style={{fontFamily:"Fraunces,serif",fontSize:20,fontWeight:700}}>{preset} Loadout</div>
+                <div style={{fontSize:12,color:T.txtD}}>{packGear.length} of {gear.length} items packed</div>
+              </Row>
+              <Row g={8} style={{marginBottom:16}}>
+                <Btn v="ghost" sz="xs" onClick={()=>setIncluded(new Set(gear.map(g=>g.id)))}>Select all</Btn>
+                <Btn v="ghost" sz="xs" onClick={()=>setIncluded(new Set())}>Clear</Btn>
+                <Btn v="ghost" sz="xs" onClick={()=>setIncluded(new Set(gear.filter(g=>cfg.essentials.includes(g.cat)).map(g=>g.id)))}>Essentials only</Btn>
+              </Row>
+              {/* gear checklist */}
+              <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(auto-fill,minmax(230px,1fr))",gap:12}}>
+                {gear.map((g,i)=>{const on=included.has(g.id);const worn=WORN_CATEGORIES.has(g.cat);return(
+                  <Card key={g.id} onClick={()=>toggleItem(g.id)} style={{padding:14,cursor:"pointer",border:`1.5px solid ${on?T.gMid:T.brd}`,background:on?undefined:T.bgEl,opacity:on?1:.6,transition:"all .15s",animation:`fadeIn .35s ease ${i*.05}s both`}}>
+                    <Row g={10} style={{justifyContent:"space-between"}}>
+                      <Row g={10} style={{minWidth:0}}><span style={{fontSize:22}}>{g.ic}</span>
+                        <div style={{minWidth:0}}><div style={{fontSize:12,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.name}</div>
+                          <div style={{fontSize:11,color:T.txtD}}>{g.w}g · {g.cat}{worn?" · worn":""}</div></div></Row>
+                      <div style={{width:20,height:20,borderRadius:6,border:`1.5px solid ${on?T.gMid:T.brd}`,background:on?T.gMid:"transparent",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,flexShrink:0}}>{on?"✓":""}</div>
+                    </Row>
+                  </Card>);})}
               </div>
             </div>
-            <Card style={{padding:18,alignSelf:"start"}}>
-              <div style={{fontSize:10,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>Total Pack Weight</div>
-              <div style={{fontFamily:"Fraunces,serif",fontSize:36,fontWeight:700,color:T.gGlow,marginBottom:3}}>{(totalW/1000).toFixed(2)} kg</div>
-              <div style={{fontSize:11,color:T.txtD,marginBottom:14}}>{totalW<4500?"⚡ Ultralight":totalW<7300?"Lightweight":"Traditional"} · {gear.length} items</div>
-              {gear.slice(0,6).map(g=>(<div key={g.id} style={{marginBottom:8}}><Row style={{justifyContent:"space-between",fontSize:11,color:T.txtD,marginBottom:3}}><span>{g.name.slice(0,18)}</span><span>{g.w}g</span></Row>
-                <div style={{height:3,background:T.bgEl,borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${(g.w/totalW)*100}%`,background:T.gBright,borderRadius:2}}/></div></div>))}
-            </Card>
+            {/* summary rail */}
+            <Col g={14} style={{alignSelf:"start"}}>
+              <Card style={{padding:18}}>
+                <div style={{fontSize:10,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>Total Pack Weight</div>
+                <div style={{fontFamily:"Fraunces,serif",fontSize:36,fontWeight:700,color:overTarget?T.red:T.gGlow,marginBottom:3}}>{(packW/1000).toFixed(2)} kg</div>
+                <Row g={8} style={{marginBottom:14}}><Badge c={wclass.c===T.gBright?"g":wclass.c===T.ambL?"a":"s"}>{wclass.l}</Badge>
+                  <span style={{fontSize:11,color:T.txtD}}>base {(baseW/1000).toFixed(2)}kg · worn {(wornW/1000).toFixed(2)}kg</span></Row>
+                {/* target gauge */}
+                <Row style={{justifyContent:"space-between",fontSize:11,color:T.txtD,marginBottom:4}}><span>vs {preset} target</span><span style={{color:overTarget?T.red:T.gBright,fontWeight:600}}>{(cfg.target/1000).toFixed(1)}kg</span></Row>
+                <div style={{height:6,background:T.bgEl,borderRadius:3,overflow:"hidden",marginBottom:14}}><div style={{height:"100%",width:`${pct}%`,background:overTarget?T.red:T.gBright,borderRadius:3,transition:"width .5s ease"}}/></div>
+                {missing.length>0&&<div style={{background:`${T.ambL}14`,border:`1px solid ${T.ambL}44`,borderRadius:9,padding:"10px 12px",marginBottom:6}}>
+                  <div style={{fontSize:11,color:T.ambL,fontWeight:600,marginBottom:3}}>⚠ Missing essentials</div>
+                  <div style={{fontSize:11,color:T.txtD}}>No {missing.join(", ")} packed for this loadout.</div></div>}
+                {missing.length===0&&packGear.length>0&&<div style={{fontSize:11,color:T.gBright,marginBottom:4}}>✓ All essentials covered</div>}
+              </Card>
+              {/* category breakdown */}
+              <Card style={{padding:18}}>
+                <div style={{fontSize:10,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:12}}>Packed by Category</div>
+                {Object.entries(byCat).length===0&&<div style={{fontSize:12,color:T.txtF}}>Nothing packed yet.</div>}
+                {Object.entries(byCat).sort((a,b)=>b[1]-a[1]).map(([cat,w])=>(
+                  <div key={cat} style={{marginBottom:9}}><Row style={{justifyContent:"space-between",fontSize:11,color:T.txtD,marginBottom:3}}><span>{cat}</span><span>{w}g · {Math.round((w/packW)*100)||0}%</span></Row>
+                    <div style={{height:4,background:T.bgEl,borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${(w/packW)*100}%`,background:T.gBright,borderRadius:2,transition:"width .5s ease"}}/></div></div>))}
+              </Card>
+            </Col>
           </div>
-        )}
-        {tab==="analytics"&&(
+          );
+        })()}
+        {tab==="analytics"&&(()=>{
+          const byCatW=gear.reduce((a,g)=>{a[g.cat]=(a[g.cat]||0)+(g.w||0);return a;},{});
+          const byCatC=gear.reduce((a,g)=>{a[g.cat]=(a[g.cat]||0)+(g.cost||0);return a;},{});
+          const priciest=[...gear].sort((a,b)=>(b.cost||0)-(a.cost||0))[0];
+          const costPerUse=gear.map(g=>({...g,cpu:(g.uses>0?(g.cost||0)/g.uses:(g.cost||0))})).sort((a,b)=>b.cpu-a.cpu);
+          const avgPerGram=totalW>0?(totalCost/totalW):0;
+          return(
           <Col g={20}>
-            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"repeat(3,1fr)",gap:16}}>
+            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:16}}>
               <StatTile label="Total Value" value={"$"+totalCost.toLocaleString()} unit="invested" accent={T.gBright} icon="💰"/>
+              <StatTile label="Cost / Gram" value={"$"+avgPerGram.toFixed(2)} unit="per gram carried" accent={T.bluL} icon="⚖"/>
               <StatTile label="Needs Replacement" value={needsRepl} unit="items under 25%" accent={T.red} icon="⚠"/>
               <StatTile label="Avg Lifespan" value={avgLife+"%"} unit="remaining" accent={T.ambL} icon="📊"/>
             </div>
-            <Card><div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`}}><div style={{fontFamily:"Fraunces,serif",fontSize:14,fontWeight:600}}>Weight by Category</div></div>
-              <div style={{padding:18}}>{Object.entries(gear.reduce((a,g)=>{a[g.cat]=(a[g.cat]||0)+g.w;return a;},{})).map(([cat,w])=>(
-                <div key={cat} style={{marginBottom:10}}><Row style={{justifyContent:"space-between",fontSize:11,color:T.txtD,marginBottom:3}}><span>{cat}</span><span>{w}g</span></Row>
-                  <div style={{height:4,background:T.bgEl,borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${(w/totalW)*100}%`,background:T.gBright,borderRadius:2}}/></div></div>))}
+            <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:20}}>
+              <Card><div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`}}><div style={{fontFamily:"Fraunces,serif",fontSize:14,fontWeight:600}}>Weight by Category</div></div>
+                <div style={{padding:18}}>{Object.entries(byCatW).sort((a,b)=>b[1]-a[1]).map(([cat,w])=>(
+                  <div key={cat} style={{marginBottom:10}}><Row style={{justifyContent:"space-between",fontSize:11,color:T.txtD,marginBottom:3}}><span>{cat}</span><span>{w}g · {Math.round((w/totalW)*100)||0}%</span></Row>
+                    <div style={{height:4,background:T.bgEl,borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${(w/totalW)*100}%`,background:T.gBright,borderRadius:2}}/></div></div>))}
+                </div></Card>
+              <Card><div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`}}><div style={{fontFamily:"Fraunces,serif",fontSize:14,fontWeight:600}}>Cost by Category</div></div>
+                <div style={{padding:18}}>{Object.entries(byCatC).sort((a,b)=>b[1]-a[1]).map(([cat,c])=>(
+                  <div key={cat} style={{marginBottom:10}}><Row style={{justifyContent:"space-between",fontSize:11,color:T.txtD,marginBottom:3}}><span>{cat}</span><span>${c.toLocaleString()} · {Math.round((c/totalCost)*100)||0}%</span></Row>
+                    <div style={{height:4,background:T.bgEl,borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${(c/totalCost)*100}%`,background:T.ambL,borderRadius:2}}/></div></div>))}
+                </div></Card>
+            </div>
+            <Card><div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div style={{fontFamily:"Fraunces,serif",fontSize:14,fontWeight:600}}>Cost per Use</div>
+                {priciest&&<span style={{fontSize:11,color:T.txtD}}>Most expensive: {priciest.name} (${priciest.cost})</span>}
+              </div>
+              <div style={{padding:"6px 18px"}}>{costPerUse.map((g,i)=>(
+                <Row key={g.id} style={{padding:"10px 0",borderBottom:i<costPerUse.length-1?`1px solid ${T.brd}`:"none",gap:12}}>
+                  <span style={{fontSize:18}}>{g.ic}</span>
+                  <div style={{flex:1,minWidth:0}}><div style={{fontSize:12.5,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.name}</div>
+                    <div style={{fontSize:11,color:T.txtF}}>${g.cost} · {g.uses} use{g.uses===1?"":"s"}</div></div>
+                  <div style={{textAlign:"right"}}><div style={{fontFamily:"Fraunces,serif",fontSize:15,fontWeight:700,color:g.cpu>50?T.red:g.cpu>20?T.ambL:T.gBright}}>${g.cpu.toFixed(2)}</div><div style={{fontSize:9,color:T.txtF,textTransform:"uppercase",letterSpacing:"0.06em"}}>per use</div></div>
+                </Row>))}
               </div></Card>
           </Col>
-        )}
+          );
+        })()}
       </div>
     </div>
   );
 };
 
 const Community = ({ openAddReport }) => {
-  const { reports, toast } = useStore();
+  const { reports, following, followUser, unfollowUser, isFollowing } = useStore();
   const { isMobile } = useTheme();
   const condCol={excellent:"g",good:"a",fair:"a",poor:"r",impassable:"r"};
-  const [following,setFollowing]=useState(["Maya R","Jordan T","Priya M","Sam B"]);
+  const [helpful,setHelpful]=useState({});   // reportId -> bool voted
+  const [findOpen,setFindOpen]=useState(false);
+  const toggleHelpful=(id)=>setHelpful(h=>({...h,[id]:!h[id]}));
+  // suggested = directory users not already followed
+  const suggested = DEMO_USERS.filter(u => !isFollowing(u)).slice(0,3);
   return(
     <div style={{flex:1,overflow:"auto",padding:isMobile?16:22}}>
+      {findOpen && <FindPeopleModal onClose={()=>setFindOpen(false)}/>}
       <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:isMobile?16:20}}>
         <Card>
           <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -1311,13 +1787,16 @@ const Community = ({ openAddReport }) => {
             <Btn sz="sm" onClick={openAddReport} ic={<span style={{fontSize:11}}>＋</span>}>Add Report</Btn>
           </div>
           <div style={{padding:"6px 18px"}}>
-            {reports.map((r,i)=>(<div key={r.id} style={{padding:"12px 0",borderBottom:i<reports.length-1?`1px solid ${T.brd}`:"none"}}>
+            {reports.map((r,i)=>{const voted=!!helpful[r.id];const base=r.helpful||0;return(<div key={r.id} style={{padding:"12px 0",borderBottom:i<reports.length-1?`1px solid ${T.brd}`:"none"}}>
               <Row style={{marginBottom:8}}><div style={{width:28,height:28,borderRadius:"50%",background:`${T.gMid}33`,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:T.gBright,flexShrink:0}}>{r.user.charAt(0)}</div>
                 <div style={{flex:1,minWidth:0}}><Row g={8}><span style={{fontSize:12,fontWeight:500}}>{r.user}</span><span style={{fontSize:10,color:T.txtF}}>·</span><span style={{fontSize:11,color:T.txtD}}>{r.route}</span></Row><div style={{fontSize:10,color:T.txtF}}>{r.time}</div></div>
                 <Badge c={condCol[r.cond]}>{r.cond}</Badge></Row>
               <div style={{fontSize:12,color:T.txtD,lineHeight:1.6,marginLeft:36}}>{r.msg}</div>
-              <Row style={{marginLeft:36,marginTop:6,gap:2}}>{Array.from({length:5}).map((_,j)=><span key={j} style={{color:j<r.rating?T.ambL:T.txtF,fontSize:11}}>{j<r.rating?"★":"☆"}</span>)}</Row>
-            </div>))}
+              <Row style={{marginLeft:36,marginTop:6,justifyContent:"space-between"}}>
+                <Row g={2}>{Array.from({length:5}).map((_,j)=><span key={j} style={{color:j<r.rating?T.ambL:T.txtF,fontSize:11}}>{j<r.rating?"★":"☆"}</span>)}</Row>
+                <span onClick={()=>toggleHelpful(r.id)} style={{cursor:"pointer",fontSize:11,color:voted?T.gBright:T.txtD,userSelect:"none"}}>👍 Helpful {base+(voted?1:0)>0?`· ${base+(voted?1:0)}`:""}</span>
+              </Row>
+            </div>);})}
           </div>
         </Card>
         <Col g={20}>
@@ -1330,12 +1809,25 @@ const Community = ({ openAddReport }) => {
             </div>
           </Card>
           <Card>
-            <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`}}><div style={{fontFamily:"Fraunces,serif",fontSize:14,fontWeight:600}}>Following · {following.length}</div></div>
-            <div style={{padding:"6px 18px"}}>{following.map((n,i)=>(<Row key={i} style={{padding:"9px 0",borderBottom:i<following.length-1?`1px solid ${T.brd}`:"none",justifyContent:"space-between"}}>
-              <Row g={10}><div style={{width:32,height:32,borderRadius:"50%",background:`${T.gMid}33`,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:T.gBright}}>{n.charAt(0)}</div>
-                <div><div style={{fontSize:12,fontWeight:500}}>{n}</div><div style={{fontSize:11,color:T.txtD}}>Hiked 3 days ago</div></div></Row>
-              <Btn v="ghost" sz="xs" onClick={()=>{setFollowing(f=>f.filter(x=>x!==n));toast(`Unfollowed ${n}`);}}>Unfollow</Btn></Row>))}</div>
+            <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{fontFamily:"Fraunces,serif",fontSize:14,fontWeight:600}}>Following · {following.length}</div>
+              <Btn sz="sm" onClick={()=>setFindOpen(true)} ic={<span style={{fontSize:12}}>🔍</span>}>Find People</Btn>
+            </div>
+            <div style={{padding:"6px 18px"}}>
+              {following.length===0 && <div style={{fontSize:12,color:T.txtF,padding:"10px 0"}}>You're not following anyone yet. Tap “Find People”.</div>}
+              {following.map((u,i)=>(<Row key={u.id||i} style={{padding:"9px 0",borderBottom:i<following.length-1?`1px solid ${T.brd}`:"none",justifyContent:"space-between"}}>
+              <Row g={10}><div style={{width:32,height:32,borderRadius:"50%",background:`${T.gMid}33`,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:T.gBright}}>{u.display_name.charAt(0)}</div>
+                <div><div style={{fontSize:12,fontWeight:500}}>{u.display_name}</div><div style={{fontSize:11,color:T.txtD}}>@{u.username}</div></div></Row>
+              <Btn v="ghost" sz="xs" onClick={()=>unfollowUser(u)}>Unfollow</Btn></Row>))}
+            </div>
           </Card>
+          {suggested.length>0&&<Card>
+            <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`}}><div style={{fontFamily:"Fraunces,serif",fontSize:14,fontWeight:600}}>Suggested for You</div></div>
+            <div style={{padding:"6px 18px"}}>{suggested.map((u,i)=>(<Row key={u.id} style={{padding:"9px 0",borderBottom:i<suggested.length-1?`1px solid ${T.brd}`:"none",justifyContent:"space-between"}}>
+              <Row g={10}><div style={{width:32,height:32,borderRadius:"50%",background:`${T.amb}22`,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:T.ambL}}>{u.display_name.charAt(0)}</div>
+                <div style={{minWidth:0}}><div style={{fontSize:12,fontWeight:500}}>{u.display_name}</div><div style={{fontSize:11,color:T.txtD,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{u.bio}</div></div></Row>
+              <Btn sz="xs" onClick={()=>followUser(u)}>Follow</Btn></Row>))}</div>
+          </Card>}
         </Col>
       </div>
     </div>
@@ -1346,7 +1838,7 @@ const Community = ({ openAddReport }) => {
 //  FEED — photo/video shorts with likes + comments
 // ════════════════════════════════════════════════════════════════════════════
 const CommentSheet = ({ post, onClose }) => {
-  const { online } = useStore();
+  const { online, bumpComments } = useStore();
   const [comments, setComments] = useState([]);
   const [body, setBody] = useState("");
   const [loading, setLoading] = useState(false);
@@ -1364,6 +1856,7 @@ const CommentSheet = ({ post, onClose }) => {
     setLoading(true);
     const entry = { id: uid(), body, author:{display_name:"You"}, created_at:"now" };
     setComments(cs => [...cs, entry]); setBody("");
+    bumpComments(post.id);
     if (online) { try { await backend.addComment(post.id, entry.body); } catch {} }
     setLoading(false);
   };
@@ -1443,8 +1936,16 @@ const CreatePostModal = ({ onClose }) => {
 };
 
 const PostCard = ({ post }) => {
-  const { toggleLike, deletePost } = useStore();
+  const { toggleLike, deletePost, toast } = useStore();
   const [showComments, setShowComments] = useState(false);
+  const share = async () => {
+    const text = `${post.author?.display_name} on Summit: ${post.caption||""}`.trim();
+    try {
+      if (navigator.share) { await navigator.share({ title:"Summit", text }); return; }
+      await navigator.clipboard.writeText(text);
+      toast("Copied to clipboard ✓");
+    } catch { toast("Share canceled","warn"); }
+  };
   const grad = post.grad || ["#1e3a5f","#0d2818"];
   const isMine = post.author?.username === "you";
   return (
@@ -1484,7 +1985,7 @@ const PostCard = ({ post }) => {
             <span style={{ fontSize:17, color:T.txtD }}>💬</span>
             <span style={{ fontSize:13, color:T.txtD }}>{post.comment_count}</span>
           </Row>
-          <span style={{ fontSize:17, color:T.txtD, marginLeft:"auto", cursor:"pointer" }}>↗</span>
+          <span onClick={share} style={{ fontSize:17, color:T.txtD, marginLeft:"auto", cursor:"pointer" }}>↗</span>
         </Row>
         {post.caption ? <div style={{ fontSize:13, lineHeight:1.5 }}><strong>{post.author?.display_name}</strong> {post.caption}</div> : null}
         {post.comment_count>0 && <div onClick={()=>setShowComments(true)} style={{ fontSize:12, color:T.txtD, marginTop:6, cursor:"pointer" }}>View all {post.comment_count} comments</div>}
@@ -1494,13 +1995,25 @@ const PostCard = ({ post }) => {
 };
 
 const Feed = ({ openCreate }) => {
-  const { posts, online, toast } = useStore();
+  const { posts, following, setFeedPosts, online, toast } = useStore();
   const [scope, setScope] = useState("all");
-  // When online, optionally refresh from server on scope change
+  const [loading, setLoading] = useState(false);
+  // When online, refresh from server on scope change and store the result
   useEffect(() => {
     if (!online) return;
-    backend.listFeed(scope).then(()=>{}).catch(()=>{});
-  }, [scope, online]);
+    let cancel = false;
+    setLoading(true);
+    backend.listFeed(scope)
+      .then(list => { if (!cancel && Array.isArray(list)) setFeedPosts(list); })
+      .catch(()=>{})
+      .finally(()=>{ if(!cancel) setLoading(false); });
+    return () => { cancel = true; };
+  }, [scope, online, setFeedPosts]);
+  // In demo mode, filter locally against who you follow (by username) + your own posts
+  const followedUsernames = new Set(following.map(f => f.username));
+  const shown = scope === "following"
+    ? posts.filter(p => followedUsernames.has(p.author?.username) || p.author?.username === "you")
+    : posts;
   return (
     <div style={{ flex:1, overflow:"auto", padding:"18px 0" }}>
       <div style={{ maxWidth:520, margin:"0 auto", padding:"0 16px" }}>
@@ -1512,8 +2025,9 @@ const Feed = ({ openCreate }) => {
           </Row>
           <Btn onClick={openCreate} ic={<span style={{fontSize:13}}>＋</span>}>Post</Btn>
         </Row>
-        {posts.length===0 && <div style={{ textAlign:"center", color:T.txtF, fontSize:13, padding:40 }}>No posts yet. Share your first adventure.</div>}
-        {posts.map(p => <PostCard key={p.id} post={p}/>)}
+        {loading && <div style={{ textAlign:"center", color:T.txtF, fontSize:12, padding:12 }}>Loading feed…</div>}
+        {shown.length===0 && !loading && <div style={{ textAlign:"center", color:T.txtF, fontSize:13, padding:40 }}>{scope==="following"?"No posts from people you follow yet.":"No posts yet. Share your first adventure."}</div>}
+        {shown.map(p => <PostCard key={p.id} post={p}/>)}
       </div>
     </div>
   );
@@ -1528,25 +2042,45 @@ const Auth = ({ onAuth }) => {
   const [f,setF]=useState({email:"",password:"",username:"",display_name:""});
   const [load,setLoad]=useState(false),[err,setErr]=useState("");
   const set=k=>e=>setF(s=>({...s,[k]:e.target.value}));
+  // Demo admin shortcut: username/email "dilly" + password "dilly".
+  const isDillyAdmin = () => {
+    const id = (f.email || f.username || "").trim().toLowerCase();
+    return id === "dilly" && f.password === "dilly";
+  };
+  const mkUser = (extra={}) => {
+    const email = f.email || "";
+    const display_name = f.display_name || email.split("@")[0] || "Hiker";
+    const username = f.username || (email.split("@")[0] || "hiker").toLowerCase();
+    // Demo rule: the "dilly" account (or emails containing "admin") get the admin
+    // role. Live backends can override this by returning a role on the auth response.
+    const role = isDillyAdmin() || /admin/i.test(email) ? "admin" : "member";
+    return { display_name, email, username, bio:"", role, ...extra };
+  };
   const submit=async()=>{
     setErr(""); setLoad(true);
+    // Demo admin login — bypasses normal validation entirely.
+    if (isDillyAdmin()) {
+      onAuth({ display_name:"Dilly", email:"dilly", username:"dilly", bio:"Platform administrator", role:"admin" });
+      setLoad(false); return;
+    }
     try{
       const alive=await probeApi();
       if(alive){
+        let resp;
         if(mode==="login"){
-          await backend.login(f.email, f.password);
+          resp = await backend.login(f.email, f.password);
         } else {
           if(!f.username||f.username.length<3){ throw new Error("Username must be 3–30 characters"); }
           if(!f.display_name||f.display_name.length<2){ throw new Error("Full name required"); }
           if(f.password.length<8){ throw new Error("Password must be at least 8 characters"); }
-          await backend.register({ email:f.email, password:f.password, username:f.username, display_name:f.display_name });
+          resp = await backend.register({ email:f.email, password:f.password, username:f.username, display_name:f.display_name });
         }
-        onAuth({display_name:f.display_name||f.email.split("@")[0]});
+        onAuth(mkUser({ role: resp?.role || (/admin/i.test(f.email) ? "admin" : "member") }));
       } else { throw new Error("__offline__"); }
     }catch(e){
       if(e.message==="__offline__"){
         // No backend → demo mode straight through
-        onAuth({display_name:f.display_name||f.email.split("@")[0]||"Hiker"});
+        onAuth(mkUser());
       } else {
         setErr(e.message);
       }
@@ -1579,12 +2113,253 @@ const Auth = ({ onAuth }) => {
         {err&&<div style={{background:`${T.red}14`,border:`1px solid ${T.red}44`,borderRadius:8,padding:"9px 13px",fontSize:12,color:T.red}}>{err}</div>}
         <Btn sz="lg" load={load} onClick={submit} style={{width:"100%"}}>{mode==="login"?"Sign in":"Create account"}</Btn>
         <Row g={10}><div style={{flex:1,height:1,background:T.brd}}/><span style={{fontSize:10,color:T.txtF}}>or</span><div style={{flex:1,height:1,background:T.brd}}/></Row>
-        <Btn v="subtle" sz="lg" onClick={()=>onAuth({display_name:"Demo Hiker"})} style={{width:"100%"}}>Continue as Demo</Btn>
+        <Btn v="subtle" sz="lg" onClick={()=>onAuth({display_name:"Demo Hiker",email:"demo@summit.app",username:"demohiker",bio:"",role:"member"})} style={{width:"100%"}}>Continue as Demo</Btn>
         <div style={{fontSize:12,color:T.txtD,textAlign:"center"}}>{mode==="login"?"No account? ":"Have an account? "}
           <span style={{color:T.gBright,cursor:"pointer",textDecoration:"underline"}} onClick={()=>{setMode(m=>m==="login"?"register":"login");setErr("");}}>{mode==="login"?"Register":"Sign in"}</span></div>
         <div style={{marginTop:4,paddingTop:14,borderTop:`1px solid ${T.brd}`,textAlign:"center",fontFamily:"'Spline Sans Mono',monospace",fontSize:10,letterSpacing:"0.14em",textTransform:"uppercase",color:T.txtF}}>
-          Powered by Daie DillyAI Enterprise
+          Powered by Daie DillyAI Enterprise · {BUILD_VERSION}
         </div>
+      </div>
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+//  USER SETTINGS — profile
+// ════════════════════════════════════════════════════════════════════════════
+const Settings = ({ user, setUser }) => {
+  const { isMobile } = useTheme();
+  const { toast, online } = useStore();
+  const [f, setF] = useState({
+    display_name: user?.display_name || "",
+    username: user?.username || "",
+    email: user?.email || "",
+    bio: user?.bio || "",
+    avatar: user?.avatar || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const fileRef = useRef(null);
+  const set = k => e => setF(s => ({ ...s, [k]: e.target.value }));
+  const pickAvatar = (e) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    if (file.size > 4*1024*1024) { toast("Image too large (max 4MB)","warn"); return; }
+    setF(s => ({ ...s, avatar: URL.createObjectURL(file) }));
+  };
+  const dirty = ["display_name","username","email","bio","avatar"].some(k => (f[k]||"") !== (user?.[k]||""));
+  const save = async () => {
+    if (!f.display_name.trim()) { toast("Name can't be empty","warn"); return; }
+    setSaving(true);
+    if (online) { try { await backend.updateProfile({ display_name:f.display_name, username:f.username, bio:f.bio }); } catch {} }
+    setUser(u => ({ ...u, ...f }));
+    setSaving(false);
+    toast("Profile updated ✓");
+  };
+  return (
+    <div style={{ flex:1, overflow:"auto", padding:isMobile?16:26 }}>
+      <div style={{ maxWidth:680, margin:"0 auto" }}>
+        <div style={{ fontFamily:"Fraunces,serif", fontSize:isMobile?24:30, fontWeight:700, marginBottom:4 }}>Settings</div>
+        <div style={{ fontSize:13, color:T.txtD, marginBottom:22 }}>Manage your public profile.</div>
+        <Card>
+          <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.brd}` }}><div style={{ fontFamily:"Fraunces,serif", fontSize:15, fontWeight:600 }}>Profile</div></div>
+          <div style={{ padding:isMobile?16:22, display:"flex", flexDirection:"column", gap:18 }}>
+            {/* avatar */}
+            <Row g={16} style={{ alignItems:"center" }}>
+              <div style={{ width:74,height:74,borderRadius:"50%",overflow:"hidden",background:`linear-gradient(135deg,${T.gMid},${T.ambL})`,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:30,fontFamily:"Fraunces,serif",flexShrink:0 }}>
+                {f.avatar ? <img src={f.avatar} alt="" style={{ width:"100%",height:"100%",objectFit:"cover" }}/> : (f.display_name||"U").charAt(0).toUpperCase()}
+              </div>
+              <Col g={6}>
+                <Row g={8}>
+                  <Btn v="ghost" sz="sm" onClick={()=>fileRef.current?.click()}>Change photo</Btn>
+                  {f.avatar && <Btn v="ghost" sz="sm" onClick={()=>setF(s=>({...s,avatar:""}))}>Remove</Btn>}
+                </Row>
+                <div style={{ fontSize:11, color:T.txtF }}>JPG or PNG, up to 4MB.</div>
+                <input ref={fileRef} type="file" accept="image/*" onChange={pickAvatar} style={{ display:"none" }}/>
+              </Col>
+            </Row>
+            <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr":"1fr 1fr", gap:14 }}>
+              <Field label="Full name" value={f.display_name} onChange={set("display_name")} placeholder="Alex Kim"/>
+              <Field label="Username" value={f.username} onChange={set("username")} placeholder="alexkim"/>
+            </div>
+            <Field label="Email" type="email" value={f.email} onChange={set("email")} placeholder="you@example.com"/>
+            <div>
+              <label>Bio</label>
+              <textarea rows={3} value={f.bio} onChange={set("bio")} placeholder="Tell people about your hiking style…" style={{ resize:"vertical" }}/>
+              <div style={{ fontSize:11, color:T.txtF, marginTop:4, textAlign:"right" }}>{(f.bio||"").length}/160</div>
+            </div>
+            {user?.role==="admin" && <div style={{ fontSize:12, color:T.ambL }}>★ Admin account — you have access to the Admin panel.</div>}
+            <Row g={10} style={{ justifyContent:"flex-end" }}>
+              <Btn v="ghost" onClick={()=>setF({display_name:user?.display_name||"",username:user?.username||"",email:user?.email||"",bio:user?.bio||"",avatar:user?.avatar||""})} disabled={!dirty}>Reset</Btn>
+              <Btn onClick={save} load={saving} disabled={!dirty}>Save changes</Btn>
+            </Row>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ADMIN PANEL — users · moderation · system metrics · activity log
+//  (Visible only to users with role === "admin".)
+// ════════════════════════════════════════════════════════════════════════════
+const AdminStat = ({ label, value, sub, accent }) => (
+  <Card style={{ padding:16 }}>
+    <div style={{ fontSize:10, color:T.txtD, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:6 }}>{label}</div>
+    <div style={{ fontFamily:"Fraunces,serif", fontSize:26, fontWeight:700, color:accent||T.txt }}>{value}</div>
+    {sub && <div style={{ fontSize:11, color:T.txtF, marginTop:2 }}>{sub}</div>}
+  </Card>
+);
+
+const Admin = () => {
+  const { isMobile } = useTheme();
+  const { posts, reports, routes, gear, trips, following, activity, online, toast } = useStore();
+  const [tab, setTab] = useState("overview");
+  const [q, setQ] = useState("");
+  const [banned, setBanned] = useState({});      // username -> true
+  const [removed, setRemoved] = useState({});    // postId -> true
+
+  // Build a user roster from the directory + people you follow
+  const roster = (() => {
+    const map = new Map();
+    DEMO_USERS.forEach(u => map.set(u.username, { ...u, role:"member" }));
+    following.forEach(u => { if(!map.has(u.username)) map.set(u.username, { ...u, role:"member" }); });
+    map.set("admin", { id:"admin", username:"admin", display_name:"Admin", bio:"Platform administrator", role:"admin" });
+    return Array.from(map.values());
+  })();
+  const filteredRoster = roster.filter(u => !q || u.display_name.toLowerCase().includes(q.toLowerCase()) || u.username.toLowerCase().includes(q.toLowerCase()));
+
+  const totalLikes = posts.reduce((s,p)=>s+(p.like_count||0),0);
+  const totalComments = posts.reduce((s,p)=>s+(p.comment_count||0),0);
+  const visiblePosts = posts.filter(p=>!removed[p.id]);
+
+  const TABS = [["overview","Overview"],["users","Users"],["content","Moderation"],["system","System"],["activity","Activity"]];
+
+  const fmtTime = (iso) => { try { return new Date(iso).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"}); } catch { return ""; } };
+
+  return (
+    <div style={{ flex:1, overflow:"auto", padding:isMobile?16:26 }}>
+      <div style={{ maxWidth:1100, margin:"0 auto" }}>
+        <Row style={{ justifyContent:"space-between", alignItems:"flex-end", marginBottom:18, flexWrap:"wrap", gap:10 }}>
+          <div>
+            <Row g={10}><div style={{ fontFamily:"Fraunces,serif", fontSize:isMobile?24:30, fontWeight:700 }}>Admin</div><Badge c="a">{online?"LIVE":"DEMO"}</Badge></Row>
+            <div style={{ fontSize:13, color:T.txtD }}>Track and monitor platform activity.</div>
+          </div>
+        </Row>
+
+        {/* tab bar */}
+        <Row g={4} style={{ marginBottom:18, flexWrap:"wrap" }}>
+          {TABS.map(([id,l])=>(
+            <button key={id} onClick={()=>setTab(id)} style={{ height:34,padding:"0 15px",borderRadius:9,border:`1px solid ${tab===id?T.gBright:T.brd}`,background:tab===id?`${T.gMid}22`:"transparent",color:tab===id?T.gBright:T.txtD,fontSize:13,fontFamily:"inherit",cursor:"pointer" }}>{l}</button>
+          ))}
+        </Row>
+
+        {tab==="overview" && (
+          <Col g={18}>
+            <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)", gap:14 }}>
+              <AdminStat label="Total Users" value={roster.length} sub={`${following.length} followed by you`} accent={T.gBright}/>
+              <AdminStat label="Posts" value={visiblePosts.length} sub={`${totalLikes} likes · ${totalComments} comments`} accent={T.ambL}/>
+              <AdminStat label="Routes" value={routes.length} sub={`${trips.length} trips logged`} accent={T.bluL}/>
+              <AdminStat label="Trail Reports" value={reports.length} sub={`${Object.keys(banned).length} users banned`} accent={T.red}/>
+            </div>
+            <Card>
+              <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.brd}` }}><div style={{ fontFamily:"Fraunces,serif", fontSize:15, fontWeight:600 }}>Recent Activity</div></div>
+              <div style={{ padding:"6px 18px" }}>
+                {activity.slice(0,6).map(a=>(
+                  <Row key={a.id} style={{ padding:"9px 0", borderBottom:`1px solid ${T.brd}`, gap:10 }}>
+                    <div style={{ width:7,height:7,borderRadius:"50%",background:a.kind==="warn"?T.red:T.gBright,flexShrink:0 }}/>
+                    <div style={{ flex:1, fontSize:12.5 }}>{a.msg}</div>
+                    <div style={{ fontSize:11, color:T.txtF, fontFamily:"'Spline Sans Mono',monospace" }}>{fmtTime(a.at)}</div>
+                  </Row>
+                ))}
+                {activity.length===0 && <div style={{ fontSize:12, color:T.txtF, padding:"12px 0" }}>No activity recorded yet.</div>}
+              </div>
+            </Card>
+          </Col>
+        )}
+
+        {tab==="users" && (
+          <Card>
+            <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.brd}`, display:"flex", justifyContent:"space-between", alignItems:"center", gap:12, flexWrap:"wrap" }}>
+              <div style={{ fontFamily:"Fraunces,serif", fontSize:15, fontWeight:600 }}>Users · {filteredRoster.length}</div>
+              <input placeholder="Search users…" value={q} onChange={e=>setQ(e.target.value)} style={{ maxWidth:220 }}/>
+            </div>
+            <div style={{ padding:"4px 10px" }}>
+              {filteredRoster.map((u,i)=>{ const isBanned=!!banned[u.username]; return (
+                <Row key={u.username} style={{ padding:"10px 8px", borderBottom:i<filteredRoster.length-1?`1px solid ${T.brd}`:"none", gap:12, justifyContent:"space-between", opacity:isBanned?.55:1 }}>
+                  <Row g={11} style={{ minWidth:0 }}>
+                    <div style={{ width:36,height:36,borderRadius:"50%",background:`${T.gMid}33`,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,color:T.gBright,flexShrink:0 }}>{u.display_name.charAt(0)}</div>
+                    <div style={{ minWidth:0 }}><Row g={7}><span style={{ fontSize:13,fontWeight:600,whiteSpace:"nowrap" }}>{u.display_name}</span>{u.role==="admin"&&<Badge c="a">admin</Badge>}{isBanned&&<Badge c="r">banned</Badge>}</Row>
+                      <div style={{ fontSize:11,color:T.txtD,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>@{u.username}</div></div>
+                  </Row>
+                  {u.role!=="admin" && <Btn v={isBanned?"ghost":"danger"} sz="xs" onClick={()=>{ setBanned(b=>({...b,[u.username]:!isBanned})); toast(isBanned?`Unbanned ${u.display_name}`:`Banned ${u.display_name}`, isBanned?"ok":"warn"); }}>{isBanned?"Unban":"Ban"}</Btn>}
+                </Row>
+              );})}
+            </div>
+          </Card>
+        )}
+
+        {tab==="content" && (
+          <Card>
+            <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.brd}` }}><div style={{ fontFamily:"Fraunces,serif", fontSize:15, fontWeight:600 }}>Content Moderation · {visiblePosts.length} live posts</div></div>
+            <div style={{ padding:"4px 10px" }}>
+              {posts.map((p,i)=>{ const gone=!!removed[p.id]; return (
+                <Row key={p.id} style={{ padding:"11px 8px", borderBottom:i<posts.length-1?`1px solid ${T.brd}`:"none", gap:12, justifyContent:"space-between", opacity:gone?.5:1 }}>
+                  <Row g={11} style={{ minWidth:0 }}>
+                    <div style={{ width:42,height:42,borderRadius:8,background:`linear-gradient(160deg,${(p.grad||["#1e3a5f","#0d2818"])[0]},${(p.grad||["#1e3a5f","#0d2818"])[1]})`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:18 }}>{p.kind==="video"?"🎬":"🏔"}</div>
+                    <div style={{ minWidth:0 }}><div style={{ fontSize:12.5,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{p.caption||"(no caption)"}</div>
+                      <div style={{ fontSize:11,color:T.txtD }}>{p.author?.display_name} · ♥ {p.like_count||0} · 💬 {p.comment_count||0}{gone?" · removed":""}</div></div>
+                  </Row>
+                  <Btn v={gone?"ghost":"danger"} sz="xs" onClick={()=>{ setRemoved(r=>({...r,[p.id]:!gone})); toast(gone?"Post restored":"Post removed", gone?"ok":"warn"); }}>{gone?"Restore":"Remove"}</Btn>
+                </Row>
+              );})}
+              <div style={{ padding:"14px 8px 6px", fontFamily:"Fraunces,serif", fontSize:14, fontWeight:600 }}>Flagged Trail Reports</div>
+              {reports.map((r,i)=>(
+                <Row key={r.id} style={{ padding:"10px 8px", borderBottom:i<reports.length-1?`1px solid ${T.brd}`:"none", gap:12, justifyContent:"space-between" }}>
+                  <div style={{ minWidth:0 }}><div style={{ fontSize:12.5,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{r.msg}</div><div style={{ fontSize:11,color:T.txtD }}>{r.user} · {r.route}</div></div>
+                  <Badge c={({excellent:"g",good:"a",fair:"a",poor:"r",impassable:"r"})[r.cond]}>{r.cond}</Badge>
+                </Row>
+              ))}
+            </div>
+          </Card>
+        )}
+
+        {tab==="system" && (
+          <Col g={18}>
+            <div style={{ display:"grid", gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)", gap:14 }}>
+              <AdminStat label="API Status" value={online?"Online":"Offline"} sub={online?"Backend reachable":"Demo mode"} accent={online?T.gBright:T.red}/>
+              <AdminStat label="Data Source" value={API_CONFIGURED?"Live":"Seed"} sub={API_CONFIGURED?"window.SUMMIT_API set":"No backend URL"} accent={T.ambL}/>
+              <AdminStat label="Build" value={BUILD_VERSION} sub="front-end version" accent={T.bluL}/>
+              <AdminStat label="Records" value={routes.length+gear.length+trips.length+posts.length} sub="loaded entities" accent={T.gBright}/>
+            </div>
+            <Card>
+              <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.brd}` }}><div style={{ fontFamily:"Fraunces,serif", fontSize:15, fontWeight:600 }}>Subsystem Health</div></div>
+              <div style={{ padding:"6px 18px" }}>
+                {[["Authentication", true],["Routes API", online],["Feed / Media", online],["Maps (Esri tiles)", true],["3D Renderer (WebGL)", typeof window!=="undefined" && !!window.WebGLRenderingContext]].map(([name,ok],i,arr)=>(
+                  <Row key={name} style={{ padding:"10px 0", borderBottom:i<arr.length-1?`1px solid ${T.brd}`:"none", justifyContent:"space-between" }}>
+                    <div style={{ fontSize:13 }}>{name}</div>
+                    <Row g={7}><div style={{ width:8,height:8,borderRadius:"50%",background:ok?T.gBright:T.red }}/><span style={{ fontSize:12,color:ok?T.gBright:T.red }}>{ok?"Operational":"Unavailable"}</span></Row>
+                  </Row>
+                ))}
+              </div>
+            </Card>
+          </Col>
+        )}
+
+        {tab==="activity" && (
+          <Card>
+            <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.brd}` }}><div style={{ fontFamily:"Fraunces,serif", fontSize:15, fontWeight:600 }}>Activity Log · {activity.length}</div></div>
+            <div style={{ padding:"4px 18px", maxHeight:"60vh", overflowY:"auto" }}>
+              {activity.map(a=>(
+                <Row key={a.id} style={{ padding:"9px 0", borderBottom:`1px solid ${T.brd}`, gap:10 }}>
+                  <div style={{ width:7,height:7,borderRadius:"50%",background:a.kind==="warn"?T.red:T.gBright,flexShrink:0,marginTop:5 }}/>
+                  <div style={{ flex:1, fontSize:12.5 }}>{a.msg}</div>
+                  <div style={{ fontSize:11, color:T.txtF, fontFamily:"'Spline Sans Mono',monospace", whiteSpace:"nowrap" }}>{fmtTime(a.at)}</div>
+                </Row>
+              ))}
+              {activity.length===0 && <div style={{ fontSize:12, color:T.txtF, padding:"14px 0" }}>No activity recorded yet. Interactions will appear here.</div>}
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );
@@ -1592,13 +2367,20 @@ const Auth = ({ onAuth }) => {
 
 const NAV=[{id:"dashboard",ic:"◴",l:"Home"},{id:"feed",ic:"❏",l:"Feed"},{id:"explore",ic:"◰",l:"Explore"},{id:"trips",ic:"◷",l:"Trips"},{id:"gear",ic:"◫",l:"Gear"},{id:"community",ic:"◎",l:"Community"}];
 
-const Shell = ({ user, onLogout }) => {
+const Shell = ({ user, setUser, onLogout }) => {
   const { hydrate, online } = useStore();
   const { isMobile } = useTheme();
   const [page,setPage]=useState("dashboard");
   const [modal,setModal]=useState(null);
   useEffect(() => { hydrate(); }, [hydrate]);
-  const TITLES={dashboard:"Home",feed:"Feed",explore:"Explore routes",trips:"Your trips",gear:"Gear locker",community:"Community"};
+  const isAdmin = user?.role==="admin";
+  // Bottom-bar keeps core tabs; settings/admin reached via sidebar (desktop) or the
+  // overflow row on mobile.
+  const navItems = [...NAV,
+    {id:"settings",ic:"⚙",l:"Settings"},
+    ...(isAdmin ? [{id:"admin",ic:"⚇",l:"Admin"}] : []),
+  ];
+  const TITLES={dashboard:"Home",feed:"Feed",explore:"Explore routes",trips:"Your trips",gear:"Gear locker",community:"Community",settings:"Settings",admin:"Admin panel"};
   const headerAction={
     explore:<Btn onClick={()=>setModal("route")} ic="＋">{isMobile?"":"New route"}</Btn>,
     trips:<Btn onClick={()=>setModal("trip")} ic="▶">{isMobile?"":"Start trip"}</Btn>,
@@ -1621,6 +2403,8 @@ const Shell = ({ user, onLogout }) => {
     {page==="trips"&&<Trips openStart={()=>setModal("trip")}/>}
     {page==="gear"&&<Gear openAddGear={()=>setModal("gear")}/>}
     {page==="community"&&<Community openAddReport={()=>setModal("report")}/>}
+    {page==="settings"&&<Settings user={user} setUser={setUser}/>}
+    {page==="admin"&&isAdmin&&<Admin/>}
   </>);
   const statusPill = (
     <div title={online?"Connected to backend":"Demo mode — backend offline"} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 11px",borderRadius:20,background:online?(T.mode==="dark"?T.gDark:"#E6F0E9"):T.bgEl,border:`1px solid ${online?T.gMid+"55":T.brd}`,fontSize:10.5,color:online?T.gBright:T.txtD,fontFamily:"'Spline Sans Mono',monospace",letterSpacing:"0.06em"}}>
@@ -1637,8 +2421,9 @@ const Shell = ({ user, onLogout }) => {
         <div style={{height:56,display:"flex",alignItems:"center",padding:"0 16px",gap:10,background:T.bgCard,borderBottom:`1px solid ${T.brd}`,flexShrink:0}}>
           <div style={{width:30,height:30,borderRadius:9,background:T.gMid,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Fraunces,serif",fontWeight:800,fontSize:17}}>S</div>
           <div style={{fontFamily:"Fraunces,serif",fontSize:18,fontWeight:700,flex:1}}>{TITLES[page]}</div>
-          {statusPill}
           {headerAction[page]}
+          {isAdmin && <button onClick={()=>setPage("admin")} title="Admin" style={{width:34,height:34,borderRadius:9,border:`1px solid ${page==="admin"?T.ambL:T.brd}`,background:"transparent",color:page==="admin"?T.ambL:T.txtD,fontSize:16,cursor:"pointer"}}>⚇</button>}
+          <button onClick={()=>setPage("settings")} title="Profile & settings" style={{width:34,height:34,borderRadius:"50%",overflow:"hidden",border:`1px solid ${page==="settings"?T.gBright:T.brd}`,background:`linear-gradient(135deg,${T.gMid},${T.ambL})`,color:"#fff",fontWeight:700,fontFamily:"Fraunces,serif",cursor:"pointer",padding:0}}>{user?.avatar?<img src={user.avatar} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:((user?.display_name||"U").charAt(0)).toUpperCase()}</button>
           <ThemeToggle style={{width:34,height:34}}/>
         </div>
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>{pages}</div>
@@ -1662,20 +2447,21 @@ const Shell = ({ user, onLogout }) => {
           <div style={{fontFamily:"Fraunces,serif",fontWeight:700,fontSize:20}}>Summit</div>
         </Row>
         <Col g={3}>
-          {NAV.map(n=>{const on=page===n.id;return(
-            <button key={n.id} onClick={()=>setPage(n.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 12px",borderRadius:11,border:"none",background:on?(T.mode==="dark"?T.gDark:"#E6F0E9"):"transparent",color:on?(T.mode==="dark"?T.gGlow:T.gDark):T.txtD,fontSize:14.5,fontWeight:on?600:500,transition:"all .15s",textAlign:"left"}}
+          {navItems.map(n=>{const on=page===n.id;return(
+            <button key={n.id} onClick={()=>setPage(n.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 12px",borderRadius:11,border:"none",background:on?(T.mode==="dark"?T.gDark:"#E6F0E9"):"transparent",color:on?(T.mode==="dark"?T.gGlow:T.gDark):(n.id==="admin"?T.ambL:T.txtD),fontSize:14.5,fontWeight:on?600:500,transition:"all .15s",textAlign:"left"}}
               onMouseEnter={e=>{if(!on)e.currentTarget.style.background=T.bgEl}} onMouseLeave={e=>{if(!on)e.currentTarget.style.background="transparent"}}>
               <span style={{fontSize:18,width:20,textAlign:"center"}}>{n.ic}</span>{n.l}
             </button>);})}
         </Col>
         <div style={{marginTop:"auto"}}>
           <Row g={10} style={{padding:"12px 8px 0",borderTop:`1px solid ${T.brd}`}}>
-            <div onClick={onLogout} title="Sign out" style={{width:34,height:34,borderRadius:10,background:`linear-gradient(135deg,${T.gMid},${T.ambL})`,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,cursor:"pointer",fontFamily:"Fraunces,serif"}}>{((user?.display_name||"U").charAt(0)).toUpperCase()}</div>
-            <div style={{flex:1,minWidth:0}}><div style={{fontSize:13.5,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{user?.display_name||"Hiker"}</div><div style={{fontSize:12,color:T.txtF}}>Free plan</div></div>
+            <div onClick={()=>setPage("settings")} title="Profile & settings" style={{width:34,height:34,borderRadius:10,overflow:"hidden",background:`linear-gradient(135deg,${T.gMid},${T.ambL})`,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,cursor:"pointer",fontFamily:"Fraunces,serif"}}>{user?.avatar?<img src={user.avatar} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:((user?.display_name||"U").charAt(0)).toUpperCase()}</div>
+            <div onClick={()=>setPage("settings")} style={{flex:1,minWidth:0,cursor:"pointer"}}><div style={{fontSize:13.5,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{user?.display_name||"Hiker"}</div><div style={{fontSize:12,color:T.txtF}}>{isAdmin?"Administrator":"Free plan"}</div></div>
+            <span onClick={onLogout} title="Sign out" style={{cursor:"pointer",color:T.txtF,fontSize:16,padding:"0 4px"}}>⎋</span>
             <ThemeToggle/>
           </Row>
           <div style={{padding:"10px 8px 0",fontFamily:"'Spline Sans Mono',monospace",fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",color:T.txtF,lineHeight:1.5}}>
-            Powered by<br/>Daie DillyAI Enterprise
+            Powered by<br/>Daie DillyAI Enterprise<br/>{BUILD_VERSION}
           </div>
         </div>
       </nav>
@@ -1704,6 +2490,7 @@ const Intro = ({ onDone }) => {
   const rafRef = useRef(null);
   const [phase, setPhase] = useState(0);   // 0 terrain, 1 wordmark, 2 tagline, 3 fade
   const [exiting, setExiting] = useState(false);
+  const [webgl, setWebgl] = useState(true); // false → CSS dawn fallback
 
   const finish = useCallback(() => {
     setExiting(true);
@@ -1720,11 +2507,17 @@ const Intro = ({ onDone }) => {
   useEffect(() => {
     const el = mountRef.current; if (!el) return;
     let renderer;
-    try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false }); }
-    catch { return; }
-    let W = el.clientWidth || window.innerWidth, H = el.clientHeight || window.innerHeight;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      if (!renderer || !renderer.getContext()) throw new Error("no-gl");
+    } catch { setWebgl(false); return; }
+    let W = el.clientWidth || el.offsetWidth || window.innerWidth || 1280;
+    let H = el.clientHeight || el.offsetHeight || window.innerHeight || 720;
     renderer.setSize(W, H); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
+    renderer.domElement.style.display = "block";
+    renderer.domElement.style.width = "100%";
+    renderer.domElement.style.height = "100%";
     el.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
@@ -2020,10 +2813,14 @@ const Intro = ({ onDone }) => {
     render();
 
     const onResize = () => {
-      W = el.clientWidth; H = el.clientHeight;
+      W = el.clientWidth || window.innerWidth || 1280;
+      H = el.clientHeight || window.innerHeight || 720;
       renderer.setSize(W, H); camera.aspect = W / H; camera.updateProjectionMatrix();
     };
     window.addEventListener("resize", onResize);
+    // Re-measure after layout settles (guards against a 0-size first frame)
+    requestAnimationFrame(onResize);
+    setTimeout(onResize, 60);
     return () => {
       cancelAnimationFrame(rafRef.current);
       window.removeEventListener("resize", onResize);
@@ -2035,7 +2832,21 @@ const Intro = ({ onDone }) => {
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#10151A", overflow: "hidden",
       opacity: exiting ? 0 : 1, transition: "opacity .9s ease", pointerEvents: exiting ? "none" : "auto" }}>
-      <div ref={mountRef} style={{ position: "absolute", inset: 0 }} />
+      <div ref={mountRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+
+      {/* CSS dawn fallback when WebGL is unavailable — keeps the intro intentional */}
+      {!webgl && (
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none",
+          background: "linear-gradient(180deg, #121a2e 0%, #2a3358 38%, #7a5a6e 64%, #f0a463 86%, #f6c98b 100%)" }}>
+          <div style={{ position: "absolute", left: "26%", top: "40%", width: 140, height: 140, borderRadius: "50%",
+            background: "radial-gradient(circle, #fff3d6 0%, rgba(255,210,140,.5) 30%, rgba(255,170,110,0) 70%)", transform: "translate(-50%,-50%)" }} />
+          {/* simple ridge silhouette */}
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+            <polygon points="0,100 0,72 18,60 34,68 50,40 66,62 82,54 100,70 100,100" fill="#222a39" />
+            <polygon points="0,100 0,84 22,76 42,82 58,66 76,80 100,78 100,100" fill="#171d29" />
+          </svg>
+        </div>
+      )}
 
       {/* Vignette + warm grade */}
       <div style={{ position: "absolute", inset: 0, pointerEvents: "none",
@@ -2082,7 +2893,7 @@ const Intro = ({ onDone }) => {
         fontFamily: "'Spline Sans Mono',monospace", fontSize: 10.5, letterSpacing: "0.16em",
         textTransform: "uppercase", color: "rgba(255,255,255,.5)", pointerEvents: "none",
         opacity: phase >= 2 ? 1 : 0, transition: "opacity 1s ease .2s" }}>
-        Powered by Daie DillyAI Enterprise
+        Powered by Daie DillyAI Enterprise · {BUILD_VERSION}
       </div>
     </div>
   );
@@ -2100,7 +2911,7 @@ function App() {
       <StoreProvider>
         {!user
           ? <Auth onAuth={setUser}/>
-          : <Shell user={user} onLogout={()=>{_token=null;_apiAlive=null;setUser(null);}}/>}
+          : <Shell user={user} setUser={setUser} onLogout={()=>{_token=null;_apiAlive=null;setUser(null);}}/>}
         <Toasts/>
       </StoreProvider>
     </ThemeProvider>
