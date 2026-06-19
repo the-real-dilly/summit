@@ -4,37 +4,47 @@ const { useState, useRef, useEffect, useCallback, createContext, useContext } = 
 
 
 // Build version — shown next to the "Powered by" credit. Bump on each release.
-const BUILD_VERSION = "v6.1.0";
+const BUILD_VERSION = "v1.0-beta";
 
 // ════════════════════════════════════════════════════════════════════════════
 //  THEME — "Field Guide": bright modern SaaS × printed trail-guide warmth.
 //  Light + dark. Key names are kept stable so every component can read `T.*`;
 //  `T` is swapped for the active palette at the top of <App> via ThemeProvider.
-//  Fonts: Fraunces (display serif), Inter Tight (UI), Spline Sans Mono (labels).
+//  Fonts: Space Grotesk (display serif), Sora (UI), JetBrains Mono (labels).
+// ════════════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════════════
+//  SUMMIT 2.0 — "At Altitude": the view at blue hour from high on a peak.
+//  Deep indigo sky, glacier-mint instrument glow, beacon-ember warmth, frosted
+//  glass surfaces. Same token key names so every component restyles at once;
+//  a few glass-specific keys (glass/glassBrd/glow/bgGrad) are added on top.
 // ════════════════════════════════════════════════════════════════════════════
 const LIGHT = {
   mode:"light",
-  bg:"#FBFAF7", bgCard:"#FFFFFF", bgEl:"#F4F2EC", bgHov:"#EFEDE5", bgAct:"#E9E6DC",
-  gDark:"#143F2A", gMid:"#1F5C3D", gBright:"#1F5C3D", gGlow:"#2C7A52",
-  amb:"#C98A00", ambL:"#E8763A", ambBr:"#E8763A",
-  sDim:"#D8D3C6", sMed:"#9AA39C", sLt:"#5C6660",
-  txt:"#1A1F1C", txtD:"#5C6660", txtF:"#9AA39C",
-  red:"#C0392B", redD:"#FBE8E5", blu:"#2E6F9E", bluL:"#2E6F9E",
-  brd:"#E7E3D9", brdBr:"#D8D3C6", pur:"#7C5CCB",
-  shadow:"0 1px 2px rgba(26,31,28,.04), 0 4px 16px rgba(26,31,28,.06)",
-  shadowLg:"0 8px 40px rgba(26,31,28,.12)",
+  bg:"#EEF2F8", bgCard:"#FFFFFF", bgEl:"#F2F5FA", bgHov:"#E9EEF6", bgAct:"#E0E7F1",
+  gDark:"#0E7C6B", gMid:"#13A893", gBright:"#0FA88F", gGlow:"#13C0A6",
+  amb:"#D9742E", ambL:"#F2784A", ambBr:"#FF8A5B",
+  sDim:"#D4DEEC", sMed:"#8A99AE", sLt:"#5A687E",
+  txt:"#0E1726", txtD:"#566479", txtF:"#8A99AE",
+  red:"#D6453B", redD:"#FCE9E7", blu:"#3B6FE0", bluL:"#3B6FE0",
+  brd:"#DDE5F0", brdBr:"#C8D4E4", pur:"#7C5CCB",
+  glass:"rgba(255,255,255,0.72)", glassBrd:"rgba(255,255,255,0.9)", glow:"rgba(15,168,143,0.30)",
+  bgGrad:"radial-gradient(1100px 600px at 8% -10%, rgba(15,168,143,.12), transparent 60%), radial-gradient(900px 600px at 100% 0%, rgba(59,111,224,.10), transparent 55%), #EEF2F8",
+  shadow:"0 1px 2px rgba(14,23,38,.04), 0 8px 28px rgba(14,23,38,.07)",
+  shadowLg:"0 18px 60px rgba(14,23,38,.16)",
 };
 const DARK = {
   mode:"dark",
-  bg:"#10151A", bgCard:"#171E25", bgEl:"#1E272F", bgHov:"#243039", bgAct:"#2A3742",
-  gDark:"#1B3A2B", gMid:"#2C7A52", gBright:"#5FB084", gGlow:"#7CC79C",
-  amb:"#E8B43C", ambL:"#F08A52", ambBr:"#F4A56E",
-  sDim:"#324049", sMed:"#5E726C", sLt:"#9DB0AC",
-  txt:"#ECF1F0", txtD:"#9DB0AC", txtF:"#5E726C",
-  red:"#E8675A", redD:"#3A1C1A", blu:"#62A8D6", bluL:"#62A8D6",
-  brd:"#26313A", brdBr:"#324049", pur:"#A78BFA",
-  shadow:"0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.3)",
-  shadowLg:"0 8px 40px rgba(0,0,0,.5)",
+  bg:"#0A0E1A", bgCard:"#121A2C", bgEl:"#162035", bgHov:"#1B2740", bgAct:"#223052",
+  gDark:"#0C4A40", gMid:"#16A88F", gBright:"#5EEAD4", gGlow:"#7DF3E0",
+  amb:"#F0B046", ambL:"#FF8A5B", ambBr:"#FFA478",
+  sDim:"#2A3550", sMed:"#5C6B8A", sLt:"#9DAAC6",
+  txt:"#E8EEF7", txtD:"#9DAAC6", txtF:"#5C6B8A",
+  red:"#FF6B5E", redD:"#3A1A1C", blu:"#7C9CFF", bluL:"#7C9CFF",
+  brd:"#222E48", brdBr:"#2E3C5C", pur:"#A78BFA",
+  glass:"rgba(20,29,51,0.55)", glassBrd:"rgba(124,156,255,0.18)", glow:"rgba(94,234,212,0.22)",
+  bgGrad:"radial-gradient(1100px 620px at 6% -12%, rgba(94,234,212,.10), transparent 58%), radial-gradient(1000px 680px at 100% -8%, rgba(124,156,255,.12), transparent 55%), radial-gradient(900px 700px at 60% 120%, rgba(255,138,91,.06), transparent 60%), #0A0E1A",
+  shadow:"0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.45)",
+  shadowLg:"0 24px 70px rgba(0,0,0,.6)",
 };
 
 // Mutable active-theme object. Components read `T.*`; we copy the active
@@ -65,7 +75,7 @@ const ThemeProvider = ({ children }) => {
 const GlobalCss = () => {
   const { mode } = useTheme();
   const css = `
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,800&family=Inter+Tight:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body,#root{height:100%;overflow:hidden}
 html{-webkit-text-size-adjust:100%}
@@ -75,14 +85,14 @@ html{-webkit-text-size-adjust:100%}
   input,textarea,select{font-size:16px}  /* prevents iOS auto-zoom on focus */
   button{touch-action:manipulation}
 }
-body{background:${T.bg};color:${T.txt};font-family:'Inter Tight',system-ui,sans-serif;font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
-::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:${T.brdBr};border-radius:6px;border:3px solid ${T.bg}}
-input,textarea,select{font-family:'Inter Tight',sans-serif;background:${T.bgCard};border:1.5px solid ${T.brd};border-radius:11px;color:${T.txt};padding:11px 14px;font-size:14px;outline:none;width:100%;transition:border-color .15s,box-shadow .15s}
-input:focus,textarea:focus,select:focus{border-color:${T.gBright};box-shadow:0 0 0 4px ${T.gBright}22}
+body{background:${T.bgGrad};background-attachment:fixed;color:${T.txt};font-family:'Sora',system-ui,sans-serif;font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;transition:background .4s,color .3s;letter-spacing:-0.01em}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:${T.brdBr};border-radius:6px;border:3px solid transparent;background-clip:padding-box}
+input,textarea,select{font-family:'Sora',sans-serif;background:${T.glass};backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid ${T.glassBrd};border-radius:13px;color:${T.txt};padding:12px 15px;font-size:14px;outline:none;width:100%;transition:border-color .15s,box-shadow .15s}
+input:focus,textarea:focus,select:focus{border-color:${T.gBright};box-shadow:0 0 0 3px ${T.gBright}33, 0 0 24px -4px ${T.glow}}
 input::placeholder,textarea::placeholder{color:${T.txtF}}
-button{cursor:pointer;font-family:'Inter Tight',sans-serif}
-label{font-size:11px;color:${T.txtF};font-family:'Spline Sans Mono',monospace;letter-spacing:0.10em;text-transform:uppercase;display:block;margin-bottom:6px;font-weight:500}
-::selection{background:${T.gBright}33}
+button{cursor:pointer;font-family:'Sora',sans-serif}
+label{font-size:10.5px;color:${T.txtF};font-family:'JetBrains Mono',monospace;letter-spacing:0.12em;text-transform:uppercase;display:block;margin-bottom:6px;font-weight:500}
+::selection{background:${T.gBright}44}
 @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 @keyframes glow{0%,100%{box-shadow:${T.shadow}}50%{box-shadow:${T.shadowLg}}}
@@ -197,6 +207,77 @@ const synthTrack = (gainM = 500, seed = [47.6062, -122.3321]) => {
     };
   });
 };
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ADIRONDACK 46ERS — the 46 traditional High Peaks (originally surveyed over
+//  4,000 ft). Each row: [rank, name, summit elevation (ft), round-trip miles,
+//  lat, lon]. Distances/times are typical standard-route values; difficulty is
+//  derived from distance + the trailless/scramble nature of the peak.
+// ════════════════════════════════════════════════════════════════════════════
+const ADK_46_DATA = [
+  [1,"Mount Marcy",5344,14.8,44.1126,-73.9237],
+  [2,"Algonquin Peak",5114,9.6,44.1435,-73.9870],
+  [3,"Mount Haystack",4960,17.6,44.1050,-73.9000],
+  [4,"Mount Skylight",4926,17.9,44.0950,-73.9270],
+  [5,"Whiteface Mountain",4867,10.6,44.3658,-73.9026],
+  [6,"Dix Mountain",4857,13.2,44.0830,-73.7790],
+  [7,"Gray Peak",4840,17.2,44.1020,-73.9340],
+  [8,"Iroquois Peak",4840,11.5,44.1380,-74.0030],
+  [9,"Basin Mountain",4827,15.8,44.1180,-73.8680],
+  [10,"Gothics",4736,12.6,44.1230,-73.8590],
+  [11,"Mount Colden",4714,13.8,44.1280,-73.9590],
+  [12,"Giant Mountain",4627,6.4,44.1610,-73.7200],
+  [13,"Nippletop",4620,13.6,44.0860,-73.8200],
+  [14,"Santanoni Peak",4607,15.0,44.0760,-74.1340],
+  [15,"Mount Redfield",4606,17.4,44.0890,-73.9510],
+  [16,"Wright Peak",4580,8.6,44.1530,-73.9760],
+  [17,"Saddleback Mountain",4515,14.6,44.1230,-73.8730],
+  [18,"Panther Peak",4442,15.4,44.0950,-74.1280],
+  [19,"Table Top Mountain",4427,12.4,44.1340,-73.9170],
+  [20,"Rocky Peak Ridge",4420,8.4,44.1560,-73.6960],
+  [21,"Macomb Mountain",4405,8.4,44.0560,-73.7820],
+  [22,"Armstrong Mountain",4400,12.9,44.1320,-73.8480],
+  [23,"Hough Peak",4400,12.0,44.0680,-73.7720],
+  [24,"Seward Mountain",4361,13.8,44.1650,-74.1840],
+  [25,"Mount Marshall",4360,15.6,44.1180,-74.0090],
+  [26,"Allen Mountain",4340,17.6,44.0530,-74.0140],
+  [27,"Big Slide Mountain",4240,9.6,44.1700,-73.8550],
+  [28,"Esther Mountain",4240,9.8,44.3470,-73.8980],
+  [29,"Upper Wolfjaw",4185,14.0,44.1380,-73.8400],
+  [30,"Lower Wolfjaw",4175,13.5,44.1450,-73.8290],
+  [31,"Street Mountain",4166,9.6,44.1810,-74.0070],
+  [32,"Phelps Mountain",4161,11.0,44.1480,-73.9330],
+  [33,"Mount Donaldson",4140,15.0,44.1600,-74.1980],
+  [34,"Seymour Mountain",4120,14.0,44.1760,-74.1700],
+  [35,"Sawteeth",4100,12.2,44.1080,-73.8400],
+  [36,"Cascade Mountain",4098,4.8,44.2200,-73.8610],
+  [37,"South Dix (Carson)",4060,12.6,44.0630,-73.7660],
+  [38,"Porter Mountain",4059,6.4,44.2160,-73.8460],
+  [39,"Mount Colvin",4057,12.4,44.0980,-73.8090],
+  [40,"Mount Emmons",4040,16.2,44.1540,-74.2090],
+  [41,"Dial Mountain",4020,14.2,44.0980,-73.8000],
+  [42,"East Dix (Grace Peak)",4012,11.0,44.0660,-73.7470],
+  [43,"Blake Peak",3960,15.4,44.0900,-73.8160],
+  [44,"Cliff Mountain",3960,17.0,44.0990,-73.9700],
+  [45,"Nye Mountain",3895,9.6,44.1830,-74.0150],
+  [46,"Couchsachraga Peak",3820,18.0,44.0860,-74.1500],
+];
+// ft→m gain estimate uses summit elevation minus a typical ~2,000 ft trailhead.
+const ADK_ICONS = ["⛰","🏔","🗻","🥾","🌲"];
+const ADK_46ERS = ADK_46_DATA.map(([rank,name,ft,miles,lat,lon]) => {
+  const km = +(miles*1.60934).toFixed(1);
+  const gain = Math.max(300, Math.round((ft-2000)*0.3048)); // rough vertical from a ~2,000 ft trailhead
+  const diff = miles>=16?"expert":miles>=12?"hard":miles>=8?"moderate":"easy";
+  const hrsLo = Math.max(2,Math.round(miles/1.6)), hrsHi = Math.max(hrsLo+1,Math.round(miles/1.1));
+  return {
+    id:`adk${rank}`, name, loc:"Adirondack High Peaks, NY",
+    dist:km, gain, diff, icon:ADK_ICONS[rank%ADK_ICONS.length],
+    rating:+(4.3+((ft-3800)/1600)*0.6).toFixed(1), saves:200+(47-rank)*60,
+    time:`${hrsLo}-${hrsHi}h`, rank, elev_ft:ft,
+    track:synthTrack(gain,[lat,lon]),
+  };
+});
+
 
 // Normalize a backend route (nested stats) → flat frontend card shape
 const fromBackendRoute = (r) => {
@@ -337,6 +418,15 @@ const backend = {
   followUser: (id) => apiCall("POST", `/community/follow/${id}`),
   unfollowUser: (id) => apiCall("DELETE", `/community/follow/${id}`),
   updateProfile: (body) => apiCall("PATCH", "/users/me", body),
+  me: () => apiCall("GET", "/users/me"),
+  // ── Admin (role==="admin"; backend enforces) ──
+  adminMetrics: () => apiCall("GET", "/admin/metrics"),
+  adminUsers: (q="") => apiCall("GET", `/admin/users?q=${encodeURIComponent(q)}`),
+  adminBan: (id) => apiCall("POST", `/admin/users/${id}/ban`),
+  adminUnban: (id) => apiCall("DELETE", `/admin/users/${id}/ban`),
+  adminPosts: () => apiCall("GET", "/admin/posts"),
+  adminModeratePost: (id, restore=false) => apiCall("DELETE", `/admin/posts/${id}?restore=${restore?1:0}`),
+  adminAudit: () => apiCall("GET", "/admin/audit"),
 };
 
 // Demo user directory for offline search (used when no backend is connected)
@@ -359,13 +449,7 @@ const DEMO_USERS = [
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 const SEED = {
-  routes: [
-    { id:"r1", name:"Enchantments Loop", loc:"Leavenworth, WA", dist:26.4, gain:1820, diff:"expert",   icon:"⛰", rating:4.9, saves:2341, time:"9-12h", track:synthTrack(1820,[47.4762,-120.7860]) },
-    { id:"r2", name:"Lake Serene",       loc:"Index, WA",        dist:13.2, gain:1158, diff:"hard",     icon:"🏔", rating:4.8, saves:1876, time:"5-7h",  track:synthTrack(1158,[47.8092,-121.5730]) },
-    { id:"r3", name:"Rattlesnake Ledge", loc:"North Bend, WA",   dist:7.1,  gain:396,  diff:"moderate", icon:"🦅", rating:4.6, saves:5210, time:"2-3h",  track:synthTrack(396,[47.4346,-121.7680]) },
-    { id:"r4", name:"Franklin Falls",    loc:"Snoqualmie, WA",   dist:3.2,  gain:61,   diff:"easy",     icon:"💧", rating:4.5, saves:8900, time:"1h",    track:synthTrack(61,[47.4140,-121.4430]) },
-    { id:"r5", name:"Mt Si Summit",      loc:"North Bend, WA",   dist:14.4, gain:1256, diff:"hard",     icon:"🗻", rating:4.7, saves:3102, time:"5-8h",  track:synthTrack(1256,[47.4880,-121.7230]) },
-  ],
+  routes: ADK_46ERS,
   trips: [
     { id:"t1", name:"Enchantments Traverse",   date:"Oct 14–16, 2024", dist:26.4, gain:1820, dur:"3 days", status:"completed", color:T.gBright,
       journal:["Summit reached — visibility 40km across the range","Weather shifted; descended alternate route","Camp at Perfection Lake — truly earned the name"] },
@@ -658,13 +742,13 @@ const Btn = ({children,v="pri",sz="md",load,ic,onClick,style:s,disabled,type}) =
     padding:sz==="xs"?"5px 10px":sz==="sm"?"7px 13px":sz==="lg"?"13px 22px":"10px 17px",
     fontSize:sz==="xs"?12:sz==="sm"?13:sz==="lg"?15:14,opacity:disabled?.5:1};
   const vs={
-    pri:{background:T.gMid,color:"#fff",boxShadow:T.shadow},
-    accent:{background:T.ambL,color:"#fff",boxShadow:T.shadow},
-    soft:{background:T.mode==="dark"?T.gDark:"#E6F0E9",color:T.mode==="dark"?T.gGlow:T.gDark},
-    ghost:{background:"transparent",color:T.txtD,border:`1.5px solid ${T.brd}`},
-    danger:{background:T.redD,color:T.red},
-    subtle:{background:T.bgEl,color:T.txtD,border:`1px solid ${T.brd}`},
-    active:{background:T.mode==="dark"?T.gDark:"#E6F0E9",color:T.gBright,border:`1.5px solid ${T.gMid}`},
+    pri:{background:`linear-gradient(120deg, ${T.gMid}, ${T.gBright})`,color:T.mode==="dark"?"#06231F":"#fff",boxShadow:`0 4px 18px -4px ${T.glow}, 0 1px 2px rgba(0,0,0,.2)`,fontWeight:600},
+    accent:{background:`linear-gradient(120deg, ${T.amb}, ${T.ambBr})`,color:"#1a0d05",boxShadow:`0 4px 18px -4px ${T.ambL}66`,fontWeight:600},
+    soft:{background:T.mode==="dark"?"rgba(94,234,212,.12)":"#DCF5F0",color:T.mode==="dark"?T.gGlow:T.gDark},
+    ghost:{background:"transparent",color:T.txtD,border:`1px solid ${T.brd}`},
+    danger:{background:T.redD,color:T.red,border:`1px solid ${T.red}33`},
+    subtle:{background:T.glass,backdropFilter:"blur(10px)",WebkitBackdropFilter:"blur(10px)",color:T.txtD,border:`1px solid ${T.glassBrd}`},
+    active:{background:T.mode==="dark"?"rgba(94,234,212,.14)":"#DCF5F0",color:T.gBright,border:`1px solid ${T.gMid}`},
   };
   return <button type={type} style={{...base,...vs[v],...s}} onClick={!disabled&&!load?onClick:undefined}
     onMouseEnter={e=>{if(!disabled&&!load){e.currentTarget.style.filter="brightness(1.06)";e.currentTarget.style.transform="translateY(-1px)"}}}
@@ -672,25 +756,28 @@ const Btn = ({children,v="pri",sz="md",load,ic,onClick,style:s,disabled,type}) =
 };
 
 const Card = ({children,style:s,onClick,glow}) => (
-  <div onClick={onClick} style={{background:T.bgCard,border:`1px solid ${T.brd}`,borderRadius:18,overflow:"hidden",boxShadow:T.shadow,transition:"border-color .18s,transform .18s,box-shadow .18s",cursor:onClick?"pointer":"default",...s}}
-    onMouseEnter={e=>{if(onClick){e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow=T.shadowLg}}}
-    onMouseLeave={e=>{if(onClick){e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=T.shadow}}}>{children}</div>
+  <div onClick={onClick} style={{position:"relative",background:T.glass,backdropFilter:"blur(16px) saturate(140%)",WebkitBackdropFilter:"blur(16px) saturate(140%)",border:`1px solid ${T.glassBrd}`,borderRadius:18,overflow:"hidden",boxShadow:glow?`${T.shadow}, 0 0 40px -12px ${T.glow}`:T.shadow,transition:"border-color .2s,transform .2s,box-shadow .2s",cursor:onClick?"pointer":"default",...s}}
+    onMouseEnter={e=>{if(onClick){e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow=`${T.shadowLg}, 0 0 50px -14px ${T.glow}`;e.currentTarget.style.borderColor=T.gBright+"66"}}}
+    onMouseLeave={e=>{if(onClick){e.currentTarget.style.transform="";e.currentTarget.style.boxShadow=glow?`${T.shadow}, 0 0 40px -12px ${T.glow}`:T.shadow;e.currentTarget.style.borderColor=T.glassBrd}}}>
+    <div style={{position:"absolute",top:0,left:16,right:16,height:1,background:`linear-gradient(90deg,transparent,${T.mode==="dark"?"rgba(255,255,255,.18)":"rgba(255,255,255,.9)"},transparent)`,pointerEvents:"none"}}/>
+    {children}
+  </div>
 );
 
 const Badge = ({children,c="g"}) => {
   const m={
-    g:{bg:T.mode==="dark"?T.gDark:"#E6F0E9",fg:T.mode==="dark"?T.gGlow:T.gDark},
-    a:{bg:T.mode==="dark"?"#33290F":"#FBF0D6",fg:T.amb},
-    r:{bg:T.redD,fg:T.red},
-    p:{bg:T.mode==="dark"?"#2A1F45":"#EFE9FB",fg:T.pur},
-    b:{bg:T.mode==="dark"?"#1A2E3B":"#E4EEF5",fg:T.blu},
-    s:{bg:T.bgEl,fg:T.txtD},
+    g:{bg:T.mode==="dark"?"rgba(94,234,212,.14)":"#DCF5F0",fg:T.mode==="dark"?T.gGlow:T.gDark,gl:T.gBright},
+    a:{bg:T.mode==="dark"?"rgba(240,176,70,.14)":"#FBEFD6",fg:T.amb,gl:T.amb},
+    r:{bg:T.redD,fg:T.red,gl:T.red},
+    p:{bg:T.mode==="dark"?"rgba(167,139,250,.14)":"#EFE9FB",fg:T.pur,gl:T.pur},
+    b:{bg:T.mode==="dark"?"rgba(124,156,255,.14)":"#E4ECFB",fg:T.blu,gl:T.blu},
+    s:{bg:T.bgEl,fg:T.txtD,gl:T.brdBr},
   };
   const col=m[c]||m.s;
-  return <span style={{display:"inline-flex",alignItems:"center",gap:4,background:col.bg,color:col.fg,padding:"3px 10px",borderRadius:8,fontSize:11.5,fontWeight:600,letterSpacing:"0.01em",whiteSpace:"nowrap"}}>{children}</span>;
+  return <span style={{display:"inline-flex",alignItems:"center",gap:4,background:col.bg,color:col.fg,padding:"3px 10px",borderRadius:8,fontSize:11,fontWeight:600,letterSpacing:"0.02em",whiteSpace:"nowrap",border:`1px solid ${col.gl}2e`,boxShadow:`0 0 12px -4px ${col.gl}44`}}>{children}</span>;
 };
 
-const Eyebrow = ({children}) => <div style={{fontFamily:"'Spline Sans Mono',monospace",fontSize:11,fontWeight:500,letterSpacing:"0.12em",textTransform:"uppercase",color:T.txtF}}>{children}</div>;
+const Eyebrow = ({children}) => <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,fontWeight:500,letterSpacing:"0.12em",textTransform:"uppercase",color:T.txtF}}>{children}</div>;
 
 const Row=({children,g=12,style:s})=><div style={{display:"flex",alignItems:"center",gap:g,...s}}>{children}</div>;
 const Col=({children,g=12,style:s})=><div style={{display:"flex",flexDirection:"column",gap:g,...s}}>{children}</div>;
@@ -698,9 +785,9 @@ const Col=({children,g=12,style:s})=><div style={{display:"flex",flexDirection:"
 // ── Modal ──
 const Modal = ({ title, onClose, children, width=440 }) => (
   <div onClick={onClose} style={{ position:"fixed", inset:0, background:"#000000bb", backdropFilter:"blur(4px)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", animation:"backdrop .2s ease", padding:20 }}>
-    <div onClick={e=>e.stopPropagation()} style={{ width, maxWidth:"100%", maxHeight:"90vh", overflow:"auto", background:T.bgCard, border:`1px solid ${T.brdBr}`, borderRadius:16, animation:"slideUp .25s ease", boxShadow:"0 24px 80px #000000aa" }}>
+    <div onClick={e=>e.stopPropagation()} style={{ width, maxWidth:"100%", maxHeight:"90vh", overflow:"auto", background:T.glass, backdropFilter:"blur(22px) saturate(150%)", WebkitBackdropFilter:"blur(22px) saturate(150%)", border:`1px solid ${T.glassBrd}`, borderRadius:18, animation:"slideUp .25s ease", boxShadow:`0 28px 90px rgba(0,0,0,.5), 0 0 60px -20px ${T.glow}` }}>
       <div style={{ padding:"18px 22px", borderBottom:`1px solid ${T.brd}`, display:"flex", justifyContent:"space-between", alignItems:"center", position:"sticky", top:0, background:T.bgCard, zIndex:1 }}>
-        <div style={{ fontFamily:"Fraunces,serif", fontSize:18, fontWeight:700 }}>{title}</div>
+        <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:18, fontWeight:700 }}>{title}</div>
         <button onClick={onClose} style={{ background:"transparent", border:"none", color:T.txtD, fontSize:22, lineHeight:1, cursor:"pointer", padding:0, width:28, height:28 }}>×</button>
       </div>
       <div style={{ padding:22 }}>{children}</div>
@@ -820,7 +907,7 @@ const WeatherWidget = ({ route, lat: latProp, lon: lonProp, compact }) => {
         <Row g={10}>
           <span style={{ fontSize:30 }}>{icon}</span>
           <div>
-            <div style={{ fontFamily:"Fraunces,serif", fontSize:22, fontWeight:700 }}>{Math.round(cur.temperature_2m)}°C</div>
+            <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:22, fontWeight:700 }}>{Math.round(cur.temperature_2m)}°C</div>
             <div style={{ fontSize:11, color:T.txtD }}>{label} · feels {Math.round(cur.apparent_temperature)}°</div>
           </div>
         </Row>
@@ -851,9 +938,7 @@ const WeatherWidget = ({ route, lat: latProp, lon: lonProp, compact }) => {
 };
 
 // ════════════════════════════════════════════════════════════════════════════
-//  3D TRAIL VIEWER
-// ════════════════════════════════════════════════════════════════════════════
-const Trail3D = ({ route }) => {
+const Trail3D = ({ route, onUnavailable }) => {
   const mountRef=useRef(null), animRef=useRef(null), flyRef=useRef(0);
   const [loaded,setLoaded]=useState(false), [camMode,setCamMode]=useState("orbit"), [failed,setFailed]=useState(false);
 
@@ -864,7 +949,7 @@ const Trail3D = ({ route }) => {
     try {
       renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
       if(!renderer || !renderer.getContext()) throw new Error("no-gl");
-    } catch(e) { setFailed(true); return; }
+    } catch(e) { setFailed(true); if(onUnavailable) onUnavailable(); return; }
     // Fallback dims if the flex parent hasn't laid out yet (avoids 0x0 canvas → blank view)
     let W=el.clientWidth||el.offsetWidth||800, H=el.clientHeight||el.offsetHeight||600;
     renderer.setSize(W,H); renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
@@ -984,7 +1069,7 @@ const Trail3D = ({ route }) => {
         <div style={{position:"absolute",top:16,left:16}}>
           <div style={{background:`${T.bgCard}ee`,backdropFilter:"blur(12px)",border:`1px solid ${T.brd}`,borderRadius:10,padding:"10px 14px"}}>
             <div style={{fontSize:10,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:4}}>Route</div>
-            <div style={{fontFamily:"Fraunces,serif",fontSize:16,fontWeight:700,color:T.gGlow}}>{route?.name||"Lake Serene"}</div>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,color:T.gGlow}}>{route?.name||"Lake Serene"}</div>
             <div style={{fontSize:11,color:T.txtD,marginTop:2}}>{route?route.dist+" km · ↑ "+route.gain+"m":"13.2 km · ↑ 1,158m"}</div>
           </div>
         </div>
@@ -1128,7 +1213,7 @@ const TopoMap2D = ({ route }) => {
       {/* basemap switcher — bottom-left, clear of the top-right 2D/3D toggle */}
       <div style={{ position:"absolute", bottom:14, left:14, zIndex:500, display:"flex", gap:4, maxWidth:"calc(100% - 28px)", overflowX:"auto", background:`${T.bgCard}dd`, backdropFilter:"blur(8px)", border:`1px solid ${T.brd}`, borderRadius:8, padding:4 }}>
         {Object.keys(ESRI_BASEMAPS).map(l => (
-          <button key={l} onClick={()=>setLayer(l)} style={{ height:26, padding:"0 10px", flexShrink:0, background:layer===l?`${T.gMid}44`:"transparent", border:`1px solid ${layer===l?T.gBright:"transparent"}`, borderRadius:6, color:layer===l?T.gBright:T.txtD, fontSize:11, fontFamily:"'Spline Sans Mono',monospace", cursor:"pointer", whiteSpace:"nowrap" }}>{l}</button>
+          <button key={l} onClick={()=>setLayer(l)} style={{ height:26, padding:"0 10px", flexShrink:0, background:layer===l?`${T.gMid}44`:"transparent", border:`1px solid ${layer===l?T.gBright:"transparent"}`, borderRadius:6, color:layer===l?T.gBright:T.txtD, fontSize:11, fontFamily:"'JetBrains Mono',monospace", cursor:"pointer", whiteSpace:"nowrap" }}>{l}</button>
         ))}
       </div>
     </div>
@@ -1250,7 +1335,7 @@ const FindPeopleModal = ({ onClose }) => {
             return (
               <Row key={u.id} style={{ justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${T.brd}` }}>
                 <Row g={11} style={{ minWidth:0 }}>
-                  <div style={{ width:38,height:38,borderRadius:"50%",background:`linear-gradient(135deg,${T.gMid},${T.ambL})`,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,flexShrink:0,fontFamily:"Fraunces,serif" }}>{u.display_name.charAt(0)}</div>
+                  <div style={{ width:38,height:38,borderRadius:"50%",background:`linear-gradient(135deg,${T.gMid},${T.ambL})`,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,flexShrink:0,fontFamily:"'Space Grotesk',sans-serif" }}>{u.display_name.charAt(0)}</div>
                   <div style={{ minWidth:0 }}>
                     <div style={{ fontSize:13,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{u.display_name} <span style={{ color:T.txtF,fontWeight:400 }}>@{u.username}</span></div>
                     {u.bio && <div style={{ fontSize:11,color:T.txtD,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{u.bio}</div>}
@@ -1356,7 +1441,7 @@ const LiveTracking = () => {
       {showStart&&<StartTripModal onClose={()=>setShowStart(false)}/>}
       <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <Row><div style={{width:8,height:8,borderRadius:"50%",background:activeTrip?T.gBright:T.sDim,animation:activeTrip?"pulse 1.5s ease infinite":"none"}}/>
-          <div style={{fontFamily:"Fraunces,serif",fontSize:14,fontWeight:600}}>Live Tracking</div></Row>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:14,fontWeight:600}}>Live Tracking</div></Row>
         {activeTrip
           ?<Btn v="danger" sz="sm" onClick={finish} ic={<span style={{fontSize:11}}>■</span>}>End Trip</Btn>
           :<Btn v="pri" sz="sm" onClick={()=>setShowStart(true)} ic={<span style={{fontSize:11}}>▶</span>}>Start Trip</Btn>}
@@ -1364,11 +1449,11 @@ const LiveTracking = () => {
       <div style={{padding:18}}>
         {activeTrip&&<div style={{background:`${T.gMid}11`,border:`1px solid ${T.gMid}44`,borderRadius:10,padding:16,marginBottom:16,textAlign:"center"}}>
           <div style={{fontSize:11,color:T.gBright,marginBottom:4}}>● {activeTrip.name}</div>
-          <div style={{fontFamily:"Fraunces,serif",fontSize:34,fontWeight:700,color:T.gGlow,letterSpacing:"0.05em"}}>{fmt(elapsed)}</div>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:34,fontWeight:700,color:T.gGlow,letterSpacing:"0.05em"}}>{fmt(elapsed)}</div>
           <Row g={32} style={{justifyContent:"center",marginTop:10}}>
-            <div><div style={{fontFamily:"Fraunces,serif",fontSize:20,fontWeight:700}}>{dist.toFixed(2)}</div><div style={{fontSize:10,color:T.txtD}}>KM</div></div>
-            <div><div style={{fontFamily:"Fraunces,serif",fontSize:20,fontWeight:700}}>{Math.round(dist*85)}</div><div style={{fontSize:10,color:T.txtD}}>M GAIN</div></div>
-            <div><div style={{fontFamily:"Fraunces,serif",fontSize:20,fontWeight:700}}>{dist>0?(elapsed/60/dist).toFixed(1):"—"}</div><div style={{fontSize:10,color:T.txtD}}>MIN/KM</div></div>
+            <div><div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:20,fontWeight:700}}>{dist.toFixed(2)}</div><div style={{fontSize:10,color:T.txtD}}>KM</div></div>
+            <div><div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:20,fontWeight:700}}>{Math.round(dist*85)}</div><div style={{fontSize:10,color:T.txtD}}>M GAIN</div></div>
+            <div><div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:20,fontWeight:700}}>{dist>0?(elapsed/60/dist).toFixed(1):"—"}</div><div style={{fontSize:10,color:T.txtD}}>MIN/KM</div></div>
           </Row>
         </div>}
         <div style={{fontSize:11,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Group · 3 Members</div>
@@ -1397,7 +1482,7 @@ const WeatherPanel = () => {
   return(
     <Card>
       <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-        <div style={{fontFamily:"Fraunces,serif",fontSize:14,fontWeight:600}}>Trail Conditions Forecast</div>
+        <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:14,fontWeight:600}}>Trail Conditions Forecast</div>
         <Badge c={risk.c}>{risk.l}</Badge>
       </div>
       <div style={{padding:18}}>
@@ -1422,7 +1507,7 @@ const StatTile=({label,value,unit,delta,up,accent,icon,delay=0})=>(
     <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:accent,opacity:.8}}/>
     <div style={{position:"absolute",right:14,top:14,fontSize:26,opacity:.1}}>{icon}</div>
     <div style={{fontSize:10,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.09em",marginBottom:7}}>{label}</div>
-    <div style={{fontFamily:"Fraunces,serif",fontSize:28,fontWeight:700,lineHeight:1,marginBottom:3}}>{value}</div>
+    <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:28,fontWeight:700,lineHeight:1,marginBottom:3}}>{value}</div>
     <div style={{fontSize:11,color:T.txtD,marginBottom:5}}>{unit}</div>
     {delta&&<div style={{fontSize:11,color:up?T.gBright:T.red}}>{up?"↑":"↓"} {delta}</div>}
   </Card>
@@ -1447,14 +1532,14 @@ const Dashboard = ({ go }) => {
         <Col g={20}>
           <Card style={{animation:"fadeIn .4s ease .3s both"}}>
             <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div style={{fontFamily:"Fraunces,serif",fontSize:14,fontWeight:600}}>{trips[0]?.name||"Latest"} — Elevation</div>
+              <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:14,fontWeight:600}}>{trips[0]?.name||"Latest"} — Elevation</div>
               <Btn v="ghost" sz="xs" onClick={()=>go("trips")}>View trip →</Btn>
             </div>
             <div style={{padding:18}}>
               <ElevChart height={100} showGrid/>
               <Row g={26} style={{marginTop:14}}>
                 {[["Max","2,394m"],["Min","614m"],["Grade","6.4%"],["Duration","11h 42m"],["Calories","3,840"]].map(([l,v])=>(
-                  <div key={l}><div style={{fontSize:10,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.07em"}}>{l}</div><div style={{fontFamily:"Fraunces,serif",fontSize:16,fontWeight:700,marginTop:2}}>{v}</div></div>))}
+                  <div key={l}><div style={{fontSize:10,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.07em"}}>{l}</div><div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,marginTop:2}}>{v}</div></div>))}
               </Row>
             </div>
           </Card>
@@ -1464,7 +1549,7 @@ const Dashboard = ({ go }) => {
           <LiveTracking/>
           <Card style={{animation:"fadeIn .4s ease .4s both"}}>
             <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div style={{fontFamily:"Fraunces,serif",fontSize:14,fontWeight:600}}>Saved Routes</div>
+              <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:14,fontWeight:600}}>Saved Routes</div>
               <Btn v="ghost" sz="xs" onClick={()=>go("explore")}>Explore →</Btn>
             </div>
             <div style={{padding:"6px 18px"}}>
@@ -1477,7 +1562,7 @@ const Dashboard = ({ go }) => {
           </Card>
         </Col>
       </div>
-      <div style={{textAlign:"center",padding:"8px 0 2px",fontFamily:"'Spline Sans Mono',monospace",fontSize:9.5,letterSpacing:"0.14em",textTransform:"uppercase",color:T.txtF}}>
+      <div style={{textAlign:"center",padding:"8px 0 2px",fontFamily:"'JetBrains Mono',monospace",fontSize:9.5,letterSpacing:"0.14em",textTransform:"uppercase",color:T.txtF}}>
         Powered by Daie DillyAI Enterprise · {BUILD_VERSION}
       </div>
     </div>
@@ -1489,6 +1574,7 @@ const Explore = ({ openNewRoute }) => {
   const { isMobile } = useTheme();
   const [sel,setSel]=useState(routes[1]||routes[0]);
   const [show3D,setShow3D]=useState(false);
+  const [webglOK,setWebglOK]=useState(true);  // flips false if 3D reports WebGL unavailable
   const [filter,setFilter]=useState("all");
   const [search,setSearch]=useState("");
   const [detail,setDetail]=useState(null); // full route w/ track for 3D
@@ -1519,11 +1605,11 @@ const Explore = ({ openNewRoute }) => {
             {sel?.id===r.id?(
               <div style={{padding:18,animation:"fadeIn .25s ease"}}>
                 <Row style={{marginBottom:10}}><span style={{fontSize:28}}>{r.icon}</span>
-                  <div style={{flex:1}}><div style={{fontFamily:"Fraunces,serif",fontSize:17,fontWeight:700}}>{r.name}</div><div style={{fontSize:11,color:T.txtD}}>📍 {r.loc}</div></div>
+                  <div style={{flex:1}}><div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:17,fontWeight:700}}>{r.name}</div><div style={{fontSize:11,color:T.txtD}}>📍 {r.loc}</div></div>
                   <Badge c={DCOL[r.diff]}>{r.diff}</Badge></Row>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
                   {[["Distance",r.dist+"km"],["Elev. Gain",r.gain+"m"],["Est. Time",r.time],["Rating",r.rating?r.rating+" ★":"—"]].map(([l,v])=>(
-                    <div key={l} style={{background:T.bgEl,borderRadius:8,padding:"9px 11px"}}><div style={{fontSize:9,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:2}}>{l}</div><div style={{fontFamily:"Fraunces,serif",fontSize:18,fontWeight:700}}>{v}</div></div>))}
+                    <div key={l} style={{background:T.bgEl,borderRadius:8,padding:"9px 11px"}}><div style={{fontSize:9,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:2}}>{l}</div><div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:18,fontWeight:700}}>{v}</div></div>))}
                 </div>
                 <ElevChart color={T.ambL} height={52}/>
                 <div style={{marginTop:14,paddingTop:14,borderTop:`1px solid ${T.brd}`}}>
@@ -1549,8 +1635,10 @@ const Explore = ({ openNewRoute }) => {
         </div>
       </div>
       <div style={{flex:1,position:"relative",overflow:"hidden",order:isMobile?1:2,minHeight:isMobile?240:0}}>
-        {show3D?<Trail3D route={view3D}/>:<TopoMap2D route={view3D}/>}
-        <div style={{position:"absolute",top:14,right:14}}><Btn v={show3D?"active":"subtle"} sz="sm" onClick={()=>setShow3D(s=>!s)} ic={<span style={{fontSize:13}}>🏔</span>}>{show3D?"2D Map":"3D View"}</Btn></div>
+        {show3D&&webglOK
+          ? <Trail3D route={view3D} onUnavailable={()=>{setWebglOK(false);setShow3D(false);}}/>
+          : <TopoMap2D route={view3D}/>}
+        {webglOK&&<div style={{position:"absolute",top:14,right:14,zIndex:600}}><Btn v={show3D?"active":"subtle"} sz="sm" onClick={()=>setShow3D(s=>!s)} ic={<span style={{fontSize:13}}>🏔</span>}>{show3D?"2D Map":"3D View"}</Btn></div>}
       </div>
     </div>
   );
@@ -1561,50 +1649,137 @@ const Trips = ({ openStart }) => {
   const { isMobile } = useTheme();
   const [sel,setSel]=useState(trips[0]);
   const [show3D,setShow3D]=useState(false);
+  const [webglOK,setWebglOK]=useState(true);
   const [journalFor,setJournalFor]=useState(null);
   useEffect(()=>{ if(!trips.find(t=>t.id===sel?.id))setSel(trips[0]); },[trips,sel]);
+
+  // Lifetime aggregates across all trips
+  const totalDist = trips.reduce((s,t)=>s+(t.dist||0),0);
+  const totalGain = trips.reduce((s,t)=>s+(t.gain||0),0);
+  const activeCount = trips.filter(t=>t.status==="active").length;
+  const hoursOf = (d) => { const m=/(\d+):(\d+)/.exec(d||""); return m?(+m[1]+ +m[2]/60):0; };
+  const totalHours = trips.reduce((s,t)=>s+hoursOf(t.dur),0);
+  const longest = trips.reduce((a,t)=>(t.dist||0)>(a?.dist||0)?t:a,null);
+
+  const HERO=[
+    {label:"Trips logged",value:trips.length,sub:activeCount?`${activeCount} active now`:"all completed",accent:T.gBright,icon:"⛰"},
+    {label:"Distance",value:totalDist.toFixed(0),unit:"km",sub:longest?`longest ${longest.dist}km`:"",accent:T.bluL,icon:"📏"},
+    {label:"Elevation",value:(totalGain/1000).toFixed(1),unit:"km ↑",sub:`${totalGain.toLocaleString()} m total`,accent:T.ambL,icon:"📈"},
+    {label:"Time moving",value:totalHours.toFixed(0),unit:"hrs",sub:"across all trips",accent:T.gGlow,icon:"⏱"},
+  ];
+
   return(
-    <div style={{flex:1,display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 380px",gap:isMobile?16:22,padding:isMobile?16:22,overflow:"auto"}}>
+    <div style={{flex:1,overflow:"auto",padding:isMobile?16:24,display:"flex",flexDirection:"column",gap:isMobile?16:22}}>
       {journalFor&&<JournalModal trip={journalFor} onClose={()=>setJournalFor(null)}/>}
-      <div>
-        {trips.map((t,i)=>(<div key={t.id} onClick={()=>setSel(t)} style={{background:T.bgCard,border:`1px solid ${sel?.id===t.id?T.brdBr:T.brd}`,borderLeft:`3px solid ${t.color}`,borderRadius:14,padding:18,marginBottom:12,cursor:"pointer",transition:"all .2s",animation:`fadeIn .4s ease ${i*.08}s both`}}
-          onMouseEnter={e=>e.currentTarget.style.transform="translateX(4px)"} onMouseLeave={e=>e.currentTarget.style.transform=""}>
-          <Row style={{marginBottom:10,justifyContent:"space-between"}}>
-            <div><div style={{fontFamily:"Fraunces,serif",fontSize:15,fontWeight:600,marginBottom:2}}>{t.name}</div><div style={{fontSize:11,color:T.txtD}}>{t.date}</div></div>
-            <Badge c={t.status==="active"?"a":"g"}>{t.status==="active"?"🟢 Active":"Completed"}</Badge></Row>
-          <ElevChart color={t.color} height={44}/>
-          <Row g={22} style={{marginTop:10}}>{[["Distance",t.dist+"km"],["Elev.",t.gain+"m"],["Time",t.dur]].map(([l,v])=>(
-            <div key={l}><div style={{fontFamily:"Fraunces,serif",fontSize:16,fontWeight:600}}>{v}</div><div style={{fontSize:10,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.07em"}}>{l}</div></div>))}</Row>
-        </div>))}
-        <Btn v="subtle" onClick={openStart} style={{width:"100%",marginTop:4}} ic={<span style={{fontSize:12}}>▶</span>}>Start New Trip</Btn>
+
+      {/* Header */}
+      <Row style={{justifyContent:"space-between",alignItems:"flex-end",flexWrap:"wrap",gap:12}}>
+        <div>
+          <Eyebrow>Your expedition log</Eyebrow>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:isMobile?26:32,fontWeight:700,letterSpacing:"-0.02em",marginTop:4}}>Trips</div>
+        </div>
+        <Btn onClick={openStart} ic={<span style={{fontSize:12}}>▶</span>}>Start new trip</Btn>
+      </Row>
+
+      {/* Lifetime hero stats */}
+      <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr 1fr":"repeat(4,1fr)",gap:isMobile?10:14}}>
+        {HERO.map((h,i)=>(
+          <Card key={h.label} glow style={{padding:isMobile?14:18,animation:`fadeIn .4s ease ${i*.06}s both`}}>
+            <Row style={{justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+              <div style={{fontSize:10,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.1em"}}>{h.label}</div>
+              <span style={{fontSize:15,opacity:.85}}>{h.icon}</span>
+            </Row>
+            <div style={{display:"flex",alignItems:"baseline",gap:5}}>
+              <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:isMobile?24:30,fontWeight:700,color:h.accent,letterSpacing:"-0.02em"}}>{h.value}</div>
+              {h.unit&&<div style={{fontSize:12,color:T.txtD,fontWeight:500}}>{h.unit}</div>}
+            </div>
+            {h.sub&&<div style={{fontSize:11,color:T.txtF,marginTop:3,fontFamily:"'JetBrains Mono',monospace"}}>{h.sub}</div>}
+          </Card>
+        ))}
       </div>
-      {sel&&<Card style={{position:isMobile?"static":"sticky",top:0,maxHeight:isMobile?"none":"calc(100vh - 130px)",display:"flex",flexDirection:"column"}}>
-        <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <div style={{fontFamily:"Fraunces,serif",fontSize:13,fontWeight:600}}>{sel.name}</div>
-          <Row g={6}><Badge c={sel.status==="active"?"a":"g"}>{sel.status}</Badge>
-            <Btn v={show3D?"active":"ghost"} sz="xs" onClick={()=>setShow3D(s=>!s)} ic={<span style={{fontSize:10}}>🏔</span>}>3D</Btn></Row>
+
+      {/* List + detail */}
+      <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 400px",gap:isMobile?16:22,alignItems:"start"}}>
+        <div style={{display:"flex",flexDirection:"column",gap:12}}>
+          {trips.map((t,i)=>{const on=sel?.id===t.id;return(
+            <Card key={t.id} onClick={()=>setSel(t)} glow={on} style={{padding:0,overflow:"hidden",border:`1px solid ${on?T.gBright+"66":T.glassBrd}`,animation:`fadeIn .4s ease ${i*.06}s both`}}>
+              <div style={{display:"flex"}}>
+                <div style={{width:4,background:`linear-gradient(${t.color},${t.color}00)`,flexShrink:0}}/>
+                <div style={{flex:1,padding:isMobile?15:18,minWidth:0}}>
+                  <Row style={{justifyContent:"space-between",marginBottom:10,gap:8}}>
+                    <div style={{minWidth:0}}>
+                      <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.name}</div>
+                      <div style={{fontSize:11,color:T.txtD,fontFamily:"'JetBrains Mono',monospace",marginTop:2}}>{t.date}</div>
+                    </div>
+                    <Badge c={t.status==="active"?"a":"g"}>{t.status==="active"?"● Active":"Completed"}</Badge>
+                  </Row>
+                  <ElevChart color={t.color} height={44}/>
+                  <Row g={20} style={{marginTop:12}}>{[["Distance",t.dist+" km"],["Elevation",t.gain+" m"],["Time",t.dur]].map(([l,v])=>(
+                    <div key={l}><div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:15,fontWeight:600}}>{v}</div><div style={{fontSize:9.5,color:T.txtF,textTransform:"uppercase",letterSpacing:"0.08em",marginTop:1}}>{l}</div></div>))}
+                    {(t.journal||[]).length>0&&<div style={{marginLeft:"auto",fontSize:11,color:T.txtF,alignSelf:"center"}}>📓 {t.journal.length}</div>}
+                  </Row>
+                </div>
+              </div>
+            </Card>
+          );})}
+          {trips.length===0&&<Card style={{padding:32,textAlign:"center"}}><div style={{fontSize:13,color:T.txtD}}>No trips yet. Start tracking your first adventure.</div></Card>}
         </div>
-        {show3D?<div style={{height:240,flexShrink:0}}><Trail3D route={sel}/></div>:<div style={{padding:"14px 18px 0"}}><ElevChart color={sel.color} height={72}/></div>}
-        <div style={{padding:18,overflowY:"auto",flex:1}}>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:16}}>
-            {[["Distance",sel.dist+"km"],["Duration",sel.dur],["Elev. Gain",sel.gain+"m"],["Date",sel.date]].map(([l,v])=>(
-              <div key={l} style={{background:T.bgEl,borderRadius:9,padding:11}}><div style={{fontSize:9,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.07em",marginBottom:2}}>{l}</div><div style={{fontFamily:"Fraunces,serif",fontSize:16,fontWeight:700}}>{v}</div></div>))}
+
+        {sel&&<Card glow style={{position:isMobile?"static":"sticky",top:0,maxHeight:isMobile?"none":"calc(100vh - 120px)",display:"flex",flexDirection:"column",padding:0}}>
+          {/* hero: 3D or elevation */}
+          <div style={{position:"relative"}}>
+            {show3D&&webglOK
+              ? <div style={{height:220}}><Trail3D route={sel} onUnavailable={()=>{setWebglOK(false);setShow3D(false);}}/></div>
+              : <div style={{padding:"22px 20px 6px",background:`linear-gradient(180deg, ${sel.color}14, transparent)`}}><ElevChart color={sel.color} height={96}/></div>}
+            <div style={{position:"absolute",top:14,left:18,right:14,display:"flex",justifyContent:"space-between",alignItems:"flex-start",pointerEvents:"none"}}>
+              <div style={{pointerEvents:"auto"}}>
+                <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:18,fontWeight:700,letterSpacing:"-0.01em",textShadow:show3D?"0 2px 12px rgba(0,0,0,.7)":"none"}}>{sel.name}</div>
+                <div style={{fontSize:11,color:show3D?"rgba(255,255,255,.8)":T.txtD,fontFamily:"'JetBrains Mono',monospace",marginTop:2}}>{sel.date}</div>
+              </div>
+              <Row g={6} style={{pointerEvents:"auto"}}>
+                <Badge c={sel.status==="active"?"a":"g"}>{sel.status}</Badge>
+                {webglOK&&<Btn v={show3D?"active":"subtle"} sz="xs" onClick={()=>setShow3D(s=>!s)} ic={<span style={{fontSize:10}}>🏔</span>}>{show3D?"Chart":"3D"}</Btn>}
+              </Row>
+            </div>
           </div>
-          {sel.track&&<div style={{marginBottom:16,paddingBottom:14,borderBottom:`1px solid ${T.brd}`}}>
-            <div style={{fontSize:10,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Conditions</div>
-            <WeatherWidget route={sel} compact/>
-          </div>}
-          <Row style={{justifyContent:"space-between",marginBottom:9}}>
-            <div style={{fontSize:10,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.08em"}}>Journal</div>
-            <Btn v="ghost" sz="xs" onClick={()=>setJournalFor(sel)} ic={<span style={{fontSize:10}}>＋</span>}>Add</Btn>
-          </Row>
-          {(sel.journal||[]).length===0&&<div style={{fontSize:11,color:T.txtF,padding:"8px 0"}}>No entries yet.</div>}
-          {(sel.journal||[]).map((e,i)=>(<Row key={i} g={9} style={{marginBottom:9,alignItems:"flex-start"}}>
-            <div style={{width:5,height:5,borderRadius:"50%",background:sel.color,marginTop:6,flexShrink:0,boxShadow:`0 0 5px ${sel.color}`}}/>
-            <div style={{fontSize:12,color:T.txtD,lineHeight:1.55}}>{e}</div></Row>))}
-          <Row g={6} style={{marginTop:14}}><Btn style={{flex:1}} onClick={()=>exportReport(sel)}>Full Report</Btn><Btn v="ghost" onClick={()=>exportGpx({name:sel.name,gain:sel.gain,track:sel.track})}>Export</Btn></Row>
-        </div>
-      </Card>}
+
+          <div style={{padding:18,overflowY:"auto",flex:1}}>
+            {/* stat grid */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:9,marginBottom:18}}>
+              {[["Distance",sel.dist+" km",T.gBright],["Duration",sel.dur,T.bluL],["Elev. gain",sel.gain+" m",T.ambL],["Status",sel.status,T.gGlow]].map(([l,v,c])=>(
+                <div key={l} style={{background:T.bgEl,borderRadius:11,padding:"11px 13px",border:`1px solid ${T.glassBrd}`}}><div style={{fontSize:9,color:T.txtF,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:3}}>{l}</div><div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:16,fontWeight:700,color:c}}>{v}</div></div>))}
+            </div>
+
+            {sel.track&&<div style={{marginBottom:18,paddingBottom:16,borderBottom:`1px solid ${T.brd}`}}>
+              <div style={{fontSize:10,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:10}}>Conditions</div>
+              <WeatherWidget route={sel} compact/>
+            </div>}
+
+            {/* journal timeline */}
+            <Row style={{justifyContent:"space-between",marginBottom:12}}>
+              <div style={{fontSize:10,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.08em"}}>Trail journal</div>
+              <Btn v="ghost" sz="xs" onClick={()=>setJournalFor(sel)} ic={<span style={{fontSize:10}}>＋</span>}>Add entry</Btn>
+            </Row>
+            {(sel.journal||[]).length===0&&<div style={{fontSize:11,color:T.txtF,padding:"4px 0 12px"}}>No entries yet. Capture a moment from this trip.</div>}
+            {(sel.journal||[]).length>0&&(
+              <div style={{position:"relative",paddingLeft:16,marginBottom:6}}>
+                <div style={{position:"absolute",left:4,top:4,bottom:4,width:1.5,background:`linear-gradient(${sel.color},${sel.color}22)`}}/>
+                {(sel.journal||[]).map((e,i)=>(
+                  <div key={i} style={{position:"relative",marginBottom:12}}>
+                    <div style={{position:"absolute",left:-15,top:4,width:8,height:8,borderRadius:"50%",background:sel.color,boxShadow:`0 0 8px ${sel.color}`}}/>
+                    <div style={{fontSize:12,color:T.txtD,lineHeight:1.6}}>{e}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <Row g={8} style={{marginTop:16}}>
+              <Btn style={{flex:1}} onClick={()=>exportReport(sel)} ic={<span style={{fontSize:12}}>📄</span>}>Full report</Btn>
+              <Btn v="ghost" onClick={()=>exportGpx({name:sel.name,gain:sel.gain,track:sel.track})} ic={<span style={{fontSize:12}}>↓</span>}>GPX</Btn>
+            </Row>
+          </div>
+        </Card>}
+      </div>
     </div>
   );
 };
@@ -1621,6 +1796,7 @@ const Gear = ({ openAddGear }) => {
   const { gear, deleteGear } = useStore();
   const { isMobile } = useTheme();
   const [tab,setTab]=useState("inventory");
+  const [confirmId,setConfirmId]=useState(null);  // gear id awaiting delete confirmation
   // Loadout state: which preset, and which gear ids are included
   const [preset,setPreset]=useState("Overnight");
   const [included,setIncluded]=useState(()=>new Set(gear.map(g=>g.id)));
@@ -1643,7 +1819,22 @@ const Gear = ({ openAddGear }) => {
             {gear.map((g,i)=>(<Card key={g.id} style={{padding:16,animation:`fadeIn .4s ease ${i*.06}s both`}}>
               <Row style={{marginBottom:10,justifyContent:"space-between"}}><span style={{fontSize:26}}>{g.ic}</span>
                 <Row g={6}><Badge c={CCOL[g.cond]}>{g.cond}</Badge>
-                  <button onClick={()=>deleteGear(g.id)} style={{background:"transparent",border:"none",color:T.txtF,fontSize:14,cursor:"pointer",padding:0}} title="Remove">🗑</button></Row></Row>
+                  {confirmId===g.id ? (
+                    <Row g={4}>
+                      <button onClick={()=>{deleteGear(g.id);setConfirmId(null);}}
+                        style={{height:26,padding:"0 10px",borderRadius:13,border:"none",background:T.red,color:"#fff",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>Remove</button>
+                      <button onClick={()=>setConfirmId(null)}
+                        style={{height:26,padding:"0 10px",borderRadius:13,border:`1px solid ${T.brd}`,background:"transparent",color:T.txtD,fontSize:11,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
+                    </Row>
+                  ) : (
+                    <button onClick={()=>setConfirmId(g.id)} title="Remove gear"
+                      onMouseEnter={e=>{e.currentTarget.style.background=`${T.red}1a`;e.currentTarget.style.color=T.red;e.currentTarget.style.borderColor=`${T.red}55`;}}
+                      onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=T.txtF;e.currentTarget.style.borderColor=T.brd;}}
+                      style={{width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",borderRadius:8,border:`1px solid ${T.brd}`,background:"transparent",color:T.txtF,fontSize:14,cursor:"pointer",padding:0,transition:"all .15s",lineHeight:1}}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                    </button>
+                  )}
+                </Row></Row>
               <div style={{fontSize:13,fontWeight:500,marginBottom:2}}>{g.name}</div>
               <div style={{fontSize:11,color:T.txtD,marginBottom:12}}>{g.brand} · {g.cat}</div>
               <Row g={14} style={{marginBottom:12}}>{[["Weight",g.w+"g"],["Cost","$"+g.cost],["Used",g.uses+"×"]].map(([l,v])=>(
@@ -1674,7 +1865,7 @@ const Gear = ({ openAddGear }) => {
                     <span style={{fontSize:15}}>{p.icon}</span>{name}</button>))}
               </Row>
               <Row style={{justifyContent:"space-between",alignItems:"baseline",marginBottom:6}}>
-                <div style={{fontFamily:"Fraunces,serif",fontSize:20,fontWeight:700}}>{preset} Loadout</div>
+                <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:20,fontWeight:700}}>{preset} Loadout</div>
                 <div style={{fontSize:12,color:T.txtD}}>{packGear.length} of {gear.length} items packed</div>
               </Row>
               <Row g={8} style={{marginBottom:16}}>
@@ -1699,7 +1890,7 @@ const Gear = ({ openAddGear }) => {
             <Col g={14} style={{alignSelf:"start"}}>
               <Card style={{padding:18}}>
                 <div style={{fontSize:10,color:T.txtD,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>Total Pack Weight</div>
-                <div style={{fontFamily:"Fraunces,serif",fontSize:36,fontWeight:700,color:overTarget?T.red:T.gGlow,marginBottom:3}}>{(packW/1000).toFixed(2)} kg</div>
+                <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:36,fontWeight:700,color:overTarget?T.red:T.gGlow,marginBottom:3}}>{(packW/1000).toFixed(2)} kg</div>
                 <Row g={8} style={{marginBottom:14}}><Badge c={wclass.c===T.gBright?"g":wclass.c===T.ambL?"a":"s"}>{wclass.l}</Badge>
                   <span style={{fontSize:11,color:T.txtD}}>base {(baseW/1000).toFixed(2)}kg · worn {(wornW/1000).toFixed(2)}kg</span></Row>
                 {/* target gauge */}
@@ -1737,19 +1928,19 @@ const Gear = ({ openAddGear }) => {
               <StatTile label="Avg Lifespan" value={avgLife+"%"} unit="remaining" accent={T.ambL} icon="📊"/>
             </div>
             <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:20}}>
-              <Card><div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`}}><div style={{fontFamily:"Fraunces,serif",fontSize:14,fontWeight:600}}>Weight by Category</div></div>
+              <Card><div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`}}><div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:14,fontWeight:600}}>Weight by Category</div></div>
                 <div style={{padding:18}}>{Object.entries(byCatW).sort((a,b)=>b[1]-a[1]).map(([cat,w])=>(
                   <div key={cat} style={{marginBottom:10}}><Row style={{justifyContent:"space-between",fontSize:11,color:T.txtD,marginBottom:3}}><span>{cat}</span><span>{w}g · {Math.round((w/totalW)*100)||0}%</span></Row>
                     <div style={{height:4,background:T.bgEl,borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${(w/totalW)*100}%`,background:T.gBright,borderRadius:2}}/></div></div>))}
                 </div></Card>
-              <Card><div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`}}><div style={{fontFamily:"Fraunces,serif",fontSize:14,fontWeight:600}}>Cost by Category</div></div>
+              <Card><div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`}}><div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:14,fontWeight:600}}>Cost by Category</div></div>
                 <div style={{padding:18}}>{Object.entries(byCatC).sort((a,b)=>b[1]-a[1]).map(([cat,c])=>(
                   <div key={cat} style={{marginBottom:10}}><Row style={{justifyContent:"space-between",fontSize:11,color:T.txtD,marginBottom:3}}><span>{cat}</span><span>${c.toLocaleString()} · {Math.round((c/totalCost)*100)||0}%</span></Row>
                     <div style={{height:4,background:T.bgEl,borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${(c/totalCost)*100}%`,background:T.ambL,borderRadius:2}}/></div></div>))}
                 </div></Card>
             </div>
             <Card><div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div style={{fontFamily:"Fraunces,serif",fontSize:14,fontWeight:600}}>Cost per Use</div>
+                <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:14,fontWeight:600}}>Cost per Use</div>
                 {priciest&&<span style={{fontSize:11,color:T.txtD}}>Most expensive: {priciest.name} (${priciest.cost})</span>}
               </div>
               <div style={{padding:"6px 18px"}}>{costPerUse.map((g,i)=>(
@@ -1757,7 +1948,7 @@ const Gear = ({ openAddGear }) => {
                   <span style={{fontSize:18}}>{g.ic}</span>
                   <div style={{flex:1,minWidth:0}}><div style={{fontSize:12.5,fontWeight:500,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{g.name}</div>
                     <div style={{fontSize:11,color:T.txtF}}>${g.cost} · {g.uses} use{g.uses===1?"":"s"}</div></div>
-                  <div style={{textAlign:"right"}}><div style={{fontFamily:"Fraunces,serif",fontSize:15,fontWeight:700,color:g.cpu>50?T.red:g.cpu>20?T.ambL:T.gBright}}>${g.cpu.toFixed(2)}</div><div style={{fontSize:9,color:T.txtF,textTransform:"uppercase",letterSpacing:"0.06em"}}>per use</div></div>
+                  <div style={{textAlign:"right"}}><div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:15,fontWeight:700,color:g.cpu>50?T.red:g.cpu>20?T.ambL:T.gBright}}>${g.cpu.toFixed(2)}</div><div style={{fontSize:9,color:T.txtF,textTransform:"uppercase",letterSpacing:"0.06em"}}>per use</div></div>
                 </Row>))}
               </div></Card>
           </Col>
@@ -1783,7 +1974,7 @@ const Community = ({ openAddReport }) => {
       <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:isMobile?16:20}}>
         <Card>
           <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div style={{fontFamily:"Fraunces,serif",fontSize:14,fontWeight:600}}>Trail Reports</div>
+            <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:14,fontWeight:600}}>Trail Reports</div>
             <Btn sz="sm" onClick={openAddReport} ic={<span style={{fontSize:11}}>＋</span>}>Add Report</Btn>
           </div>
           <div style={{padding:"6px 18px"}}>
@@ -1801,7 +1992,7 @@ const Community = ({ openAddReport }) => {
         </Card>
         <Col g={20}>
           <Card>
-            <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`}}><div style={{fontFamily:"Fraunces,serif",fontSize:14,fontWeight:600}}>Leaderboard — This Month</div></div>
+            <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`}}><div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:14,fontWeight:600}}>Leaderboard — This Month</div></div>
             <div style={{padding:"6px 18px"}}>{[{name:"Alex K",km:"124 km",icon:"🥇",col:T.ambBr},{name:"Maya R",km:"108 km",icon:"🥈",col:T.sLt},{name:"Jordan T",km:"97 km",icon:"🥉",col:T.amb},{name:"Priya M",km:"84 km",icon:"4",col:T.txtD},{name:"You",km:"71 km",icon:"5",col:T.gBright}].map((p,i)=>(
               <Row key={i} style={{padding:"9px 0",borderBottom:i<4?`1px solid ${T.brd}`:"none",gap:12}}>
                 <div style={{width:28,height:28,borderRadius:"50%",background:`${T.gMid}33`,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:i<3?14:11,fontWeight:700,color:p.col,flexShrink:0}}>{p.icon}</div>
@@ -1810,7 +2001,7 @@ const Community = ({ openAddReport }) => {
           </Card>
           <Card>
             <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div style={{fontFamily:"Fraunces,serif",fontSize:14,fontWeight:600}}>Following · {following.length}</div>
+              <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:14,fontWeight:600}}>Following · {following.length}</div>
               <Btn sz="sm" onClick={()=>setFindOpen(true)} ic={<span style={{fontSize:12}}>🔍</span>}>Find People</Btn>
             </div>
             <div style={{padding:"6px 18px"}}>
@@ -1822,7 +2013,7 @@ const Community = ({ openAddReport }) => {
             </div>
           </Card>
           {suggested.length>0&&<Card>
-            <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`}}><div style={{fontFamily:"Fraunces,serif",fontSize:14,fontWeight:600}}>Suggested for You</div></div>
+            <div style={{padding:"14px 18px",borderBottom:`1px solid ${T.brd}`}}><div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:14,fontWeight:600}}>Suggested for You</div></div>
             <div style={{padding:"6px 18px"}}>{suggested.map((u,i)=>(<Row key={u.id} style={{padding:"9px 0",borderBottom:i<suggested.length-1?`1px solid ${T.brd}`:"none",justifyContent:"space-between"}}>
               <Row g={10}><div style={{width:32,height:32,borderRadius:"50%",background:`${T.amb}22`,border:`1px solid ${T.brd}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:T.ambL}}>{u.display_name.charAt(0)}</div>
                 <div style={{minWidth:0}}><div style={{fontSize:12,fontWeight:500}}>{u.display_name}</div><div style={{fontSize:11,color:T.txtD,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{u.bio}</div></div></Row>
@@ -2092,16 +2283,16 @@ const Auth = ({ onAuth }) => {
         <Trail3D/>
         <div style={{position:"absolute",inset:0,background:"linear-gradient(to right, transparent 55%, #060d12)",pointerEvents:"none"}}/>
         <div style={{position:"absolute",bottom:64,left:64,pointerEvents:"none"}}>
-          <div style={{fontFamily:"Fraunces,serif",fontSize:56,fontWeight:900,color:T.gGlow,lineHeight:1,filter:`drop-shadow(0 0 40px ${T.gBright}55)`}}>Summit</div>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:56,fontWeight:900,color:T.gGlow,lineHeight:1,filter:`drop-shadow(0 0 40px ${T.gBright}55)`}}>Summit</div>
           <div style={{fontStyle:"italic",fontSize:16,color:T.txtD,marginTop:10,fontFamily:"Georgia,serif"}}>Your mountains. Your routes. Your data.</div>
         </div>
       </div>}
-      <div style={{width:isMobile?"100%":440,background:T.bgCard,borderLeft:isMobile?"none":`1px solid ${T.brd}`,display:"flex",flexDirection:"column",justifyContent:"center",padding:isMobile?"32px 22px":"56px 46px",gap:18,overflowY:"auto"}}>
+      <div style={{width:isMobile?"100%":440,background:T.glass,backdropFilter:"blur(20px) saturate(140%)",WebkitBackdropFilter:"blur(20px) saturate(140%)",borderLeft:isMobile?"none":`1px solid ${T.glassBrd}`,display:"flex",flexDirection:"column",justifyContent:"center",padding:isMobile?"32px 22px":"56px 46px",gap:18,overflowY:"auto"}}>
         {isMobile&&<div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
-          <div style={{width:40,height:40,borderRadius:12,background:T.gMid,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Fraunces,serif",fontWeight:800,fontSize:22}}>S</div>
-          <div style={{fontFamily:"Fraunces,serif",fontSize:26,fontWeight:800,color:T.gGlow}}>Summit</div>
+          <div style={{width:40,height:40,borderRadius:12,background:T.gMid,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Space Grotesk',sans-serif",fontWeight:800,fontSize:22}}>S</div>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:26,fontWeight:800,color:T.gGlow}}>Summit</div>
         </div>}
-        <div><div style={{fontFamily:"Fraunces,serif",fontSize:isMobile?24:28,fontWeight:700,marginBottom:5}}>{mode==="login"?"Welcome back":"Create account"}</div>
+        <div><div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:isMobile?24:28,fontWeight:700,marginBottom:5}}>{mode==="login"?"Welcome back":"Create account"}</div>
           <div style={{fontSize:12,color:T.txtD}}>{mode==="login"?"Sign in to continue":"Start tracking your adventures"}</div></div>
         <Col g={12}>
           {mode==="register"&&<>
@@ -2116,7 +2307,7 @@ const Auth = ({ onAuth }) => {
         <Btn v="subtle" sz="lg" onClick={()=>onAuth({display_name:"Demo Hiker",email:"demo@summit.app",username:"demohiker",bio:"",role:"member"})} style={{width:"100%"}}>Continue as Demo</Btn>
         <div style={{fontSize:12,color:T.txtD,textAlign:"center"}}>{mode==="login"?"No account? ":"Have an account? "}
           <span style={{color:T.gBright,cursor:"pointer",textDecoration:"underline"}} onClick={()=>{setMode(m=>m==="login"?"register":"login");setErr("");}}>{mode==="login"?"Register":"Sign in"}</span></div>
-        <div style={{marginTop:4,paddingTop:14,borderTop:`1px solid ${T.brd}`,textAlign:"center",fontFamily:"'Spline Sans Mono',monospace",fontSize:10,letterSpacing:"0.14em",textTransform:"uppercase",color:T.txtF}}>
+        <div style={{marginTop:4,paddingTop:14,borderTop:`1px solid ${T.brd}`,textAlign:"center",fontFamily:"'JetBrains Mono',monospace",fontSize:10,letterSpacing:"0.14em",textTransform:"uppercase",color:T.txtF}}>
           Powered by Daie DillyAI Enterprise · {BUILD_VERSION}
         </div>
       </div>
@@ -2157,14 +2348,14 @@ const Settings = ({ user, setUser }) => {
   return (
     <div style={{ flex:1, overflow:"auto", padding:isMobile?16:26 }}>
       <div style={{ maxWidth:680, margin:"0 auto" }}>
-        <div style={{ fontFamily:"Fraunces,serif", fontSize:isMobile?24:30, fontWeight:700, marginBottom:4 }}>Settings</div>
+        <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:isMobile?24:30, fontWeight:700, marginBottom:4 }}>Settings</div>
         <div style={{ fontSize:13, color:T.txtD, marginBottom:22 }}>Manage your public profile.</div>
         <Card>
-          <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.brd}` }}><div style={{ fontFamily:"Fraunces,serif", fontSize:15, fontWeight:600 }}>Profile</div></div>
+          <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.brd}` }}><div style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:15, fontWeight:600 }}>Profile</div></div>
           <div style={{ padding:isMobile?16:22, display:"flex", flexDirection:"column", gap:18 }}>
             {/* avatar */}
             <Row g={16} style={{ alignItems:"center" }}>
-              <div style={{ width:74,height:74,borderRadius:"50%",overflow:"hidden",background:`linear-gradient(135deg,${T.gMid},${T.ambL})`,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:30,fontFamily:"Fraunces,serif",flexShrink:0 }}>
+              <div style={{ width:74,height:74,borderRadius:"50%",overflow:"hidden",background:`linear-gradient(135deg,${T.gMid},${T.ambL})`,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,fontSize:30,fontFamily:"'Space Grotesk',sans-serif",flexShrink:0 }}>
                 {f.avatar ? <img src={f.avatar} alt="" style={{ width:"100%",height:"100%",objectFit:"cover" }}/> : (f.display_name||"U").charAt(0).toUpperCase()}
               </div>
               <Col g={6}>
@@ -2205,7 +2396,7 @@ const Settings = ({ user, setUser }) => {
 const AdminStat = ({ label, value, sub, accent }) => (
   <Card style={{ padding:16 }}>
     <div style={{ fontSize:10, color:T.txtD, textTransform:"uppercase", letterSpacing:"0.08em", marginBottom:6 }}>{label}</div>
-    <div style={{ fontFamily:"Fraunces,serif", fontSize:26, fontWeight:700, color:accent||T.txt }}>{value}</div>
+    <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:26, fontWeight:700, color:accent||T.txt }}>{value}</div>
     {sub && <div style={{ fontSize:11, color:T.txtF, marginTop:2 }}>{sub}</div>}
   </Card>
 );
@@ -2241,7 +2432,7 @@ const Admin = () => {
       <div style={{ maxWidth:1100, margin:"0 auto" }}>
         <Row style={{ justifyContent:"space-between", alignItems:"flex-end", marginBottom:18, flexWrap:"wrap", gap:10 }}>
           <div>
-            <Row g={10}><div style={{ fontFamily:"Fraunces,serif", fontSize:isMobile?24:30, fontWeight:700 }}>Admin</div><Badge c="a">{online?"LIVE":"DEMO"}</Badge></Row>
+            <Row g={10}><div style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:isMobile?24:30, fontWeight:700 }}>Admin</div><Badge c="a">{online?"LIVE":"DEMO"}</Badge></Row>
             <div style={{ fontSize:13, color:T.txtD }}>Track and monitor platform activity.</div>
           </div>
         </Row>
@@ -2262,13 +2453,13 @@ const Admin = () => {
               <AdminStat label="Trail Reports" value={reports.length} sub={`${Object.keys(banned).length} users banned`} accent={T.red}/>
             </div>
             <Card>
-              <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.brd}` }}><div style={{ fontFamily:"Fraunces,serif", fontSize:15, fontWeight:600 }}>Recent Activity</div></div>
+              <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.brd}` }}><div style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:15, fontWeight:600 }}>Recent Activity</div></div>
               <div style={{ padding:"6px 18px" }}>
                 {activity.slice(0,6).map(a=>(
                   <Row key={a.id} style={{ padding:"9px 0", borderBottom:`1px solid ${T.brd}`, gap:10 }}>
                     <div style={{ width:7,height:7,borderRadius:"50%",background:a.kind==="warn"?T.red:T.gBright,flexShrink:0 }}/>
                     <div style={{ flex:1, fontSize:12.5 }}>{a.msg}</div>
-                    <div style={{ fontSize:11, color:T.txtF, fontFamily:"'Spline Sans Mono',monospace" }}>{fmtTime(a.at)}</div>
+                    <div style={{ fontSize:11, color:T.txtF, fontFamily:"'JetBrains Mono',monospace" }}>{fmtTime(a.at)}</div>
                   </Row>
                 ))}
                 {activity.length===0 && <div style={{ fontSize:12, color:T.txtF, padding:"12px 0" }}>No activity recorded yet.</div>}
@@ -2280,7 +2471,7 @@ const Admin = () => {
         {tab==="users" && (
           <Card>
             <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.brd}`, display:"flex", justifyContent:"space-between", alignItems:"center", gap:12, flexWrap:"wrap" }}>
-              <div style={{ fontFamily:"Fraunces,serif", fontSize:15, fontWeight:600 }}>Users · {filteredRoster.length}</div>
+              <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:15, fontWeight:600 }}>Users · {filteredRoster.length}</div>
               <input placeholder="Search users…" value={q} onChange={e=>setQ(e.target.value)} style={{ maxWidth:220 }}/>
             </div>
             <div style={{ padding:"4px 10px" }}>
@@ -2300,7 +2491,7 @@ const Admin = () => {
 
         {tab==="content" && (
           <Card>
-            <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.brd}` }}><div style={{ fontFamily:"Fraunces,serif", fontSize:15, fontWeight:600 }}>Content Moderation · {visiblePosts.length} live posts</div></div>
+            <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.brd}` }}><div style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:15, fontWeight:600 }}>Content Moderation · {visiblePosts.length} live posts</div></div>
             <div style={{ padding:"4px 10px" }}>
               {posts.map((p,i)=>{ const gone=!!removed[p.id]; return (
                 <Row key={p.id} style={{ padding:"11px 8px", borderBottom:i<posts.length-1?`1px solid ${T.brd}`:"none", gap:12, justifyContent:"space-between", opacity:gone?.5:1 }}>
@@ -2312,7 +2503,7 @@ const Admin = () => {
                   <Btn v={gone?"ghost":"danger"} sz="xs" onClick={()=>{ setRemoved(r=>({...r,[p.id]:!gone})); toast(gone?"Post restored":"Post removed", gone?"ok":"warn"); }}>{gone?"Restore":"Remove"}</Btn>
                 </Row>
               );})}
-              <div style={{ padding:"14px 8px 6px", fontFamily:"Fraunces,serif", fontSize:14, fontWeight:600 }}>Flagged Trail Reports</div>
+              <div style={{ padding:"14px 8px 6px", fontFamily:"'Space Grotesk',sans-serif", fontSize:14, fontWeight:600 }}>Flagged Trail Reports</div>
               {reports.map((r,i)=>(
                 <Row key={r.id} style={{ padding:"10px 8px", borderBottom:i<reports.length-1?`1px solid ${T.brd}`:"none", gap:12, justifyContent:"space-between" }}>
                   <div style={{ minWidth:0 }}><div style={{ fontSize:12.5,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis" }}>{r.msg}</div><div style={{ fontSize:11,color:T.txtD }}>{r.user} · {r.route}</div></div>
@@ -2332,7 +2523,7 @@ const Admin = () => {
               <AdminStat label="Records" value={routes.length+gear.length+trips.length+posts.length} sub="loaded entities" accent={T.gBright}/>
             </div>
             <Card>
-              <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.brd}` }}><div style={{ fontFamily:"Fraunces,serif", fontSize:15, fontWeight:600 }}>Subsystem Health</div></div>
+              <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.brd}` }}><div style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:15, fontWeight:600 }}>Subsystem Health</div></div>
               <div style={{ padding:"6px 18px" }}>
                 {[["Authentication", true],["Routes API", online],["Feed / Media", online],["Maps (Esri tiles)", true],["3D Renderer (WebGL)", typeof window!=="undefined" && !!window.WebGLRenderingContext]].map(([name,ok],i,arr)=>(
                   <Row key={name} style={{ padding:"10px 0", borderBottom:i<arr.length-1?`1px solid ${T.brd}`:"none", justifyContent:"space-between" }}>
@@ -2347,13 +2538,13 @@ const Admin = () => {
 
         {tab==="activity" && (
           <Card>
-            <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.brd}` }}><div style={{ fontFamily:"Fraunces,serif", fontSize:15, fontWeight:600 }}>Activity Log · {activity.length}</div></div>
+            <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.brd}` }}><div style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:15, fontWeight:600 }}>Activity Log · {activity.length}</div></div>
             <div style={{ padding:"4px 18px", maxHeight:"60vh", overflowY:"auto" }}>
               {activity.map(a=>(
                 <Row key={a.id} style={{ padding:"9px 0", borderBottom:`1px solid ${T.brd}`, gap:10 }}>
                   <div style={{ width:7,height:7,borderRadius:"50%",background:a.kind==="warn"?T.red:T.gBright,flexShrink:0,marginTop:5 }}/>
                   <div style={{ flex:1, fontSize:12.5 }}>{a.msg}</div>
-                  <div style={{ fontSize:11, color:T.txtF, fontFamily:"'Spline Sans Mono',monospace", whiteSpace:"nowrap" }}>{fmtTime(a.at)}</div>
+                  <div style={{ fontSize:11, color:T.txtF, fontFamily:"'JetBrains Mono',monospace", whiteSpace:"nowrap" }}>{fmtTime(a.at)}</div>
                 </Row>
               ))}
               {activity.length===0 && <div style={{ fontSize:12, color:T.txtF, padding:"14px 0" }}>No activity recorded yet. Interactions will appear here.</div>}
@@ -2407,7 +2598,7 @@ const Shell = ({ user, setUser, onLogout }) => {
     {page==="admin"&&isAdmin&&<Admin/>}
   </>);
   const statusPill = (
-    <div title={online?"Connected to backend":"Demo mode — backend offline"} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 11px",borderRadius:20,background:online?(T.mode==="dark"?T.gDark:"#E6F0E9"):T.bgEl,border:`1px solid ${online?T.gMid+"55":T.brd}`,fontSize:10.5,color:online?T.gBright:T.txtD,fontFamily:"'Spline Sans Mono',monospace",letterSpacing:"0.06em"}}>
+    <div title={online?"Connected to backend":"Demo mode — backend offline"} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 11px",borderRadius:20,background:online?(T.mode==="dark"?T.gDark:"#E6F0E9"):T.bgEl,border:`1px solid ${online?T.gMid+"55":T.brd}`,fontSize:10.5,color:online?T.gBright:T.txtD,fontFamily:"'JetBrains Mono',monospace",letterSpacing:"0.06em"}}>
       <div style={{width:7,height:7,borderRadius:"50%",background:online?T.gBright:T.sMed,animation:online?"pulse 2s ease infinite":"none"}}/>
       {online?"LIVE":"DEMO"}
     </div>
@@ -2418,16 +2609,16 @@ const Shell = ({ user, setUser, onLogout }) => {
     return (
       <div className="app-h" style={{display:"flex",flexDirection:"column",overflow:"hidden",background:T.bg}}>
         {modals}
-        <div style={{height:56,display:"flex",alignItems:"center",padding:"0 16px",gap:10,background:T.bgCard,borderBottom:`1px solid ${T.brd}`,flexShrink:0}}>
-          <div style={{width:30,height:30,borderRadius:9,background:T.gMid,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Fraunces,serif",fontWeight:800,fontSize:17}}>S</div>
-          <div style={{fontFamily:"Fraunces,serif",fontSize:18,fontWeight:700,flex:1}}>{TITLES[page]}</div>
+        <div style={{height:56,display:"flex",alignItems:"center",padding:"0 16px",gap:10,background:T.glass,backdropFilter:"blur(18px) saturate(140%)",WebkitBackdropFilter:"blur(18px) saturate(140%)",borderBottom:`1px solid ${T.glassBrd}`,flexShrink:0,zIndex:5}}>
+          <div style={{width:30,height:30,borderRadius:9,background:T.gMid,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Space Grotesk',sans-serif",fontWeight:800,fontSize:17}}>S</div>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:18,fontWeight:700,flex:1}}>{TITLES[page]}</div>
           {headerAction[page]}
           {isAdmin && <button onClick={()=>setPage("admin")} title="Admin" style={{width:34,height:34,borderRadius:9,border:`1px solid ${page==="admin"?T.ambL:T.brd}`,background:"transparent",color:page==="admin"?T.ambL:T.txtD,fontSize:16,cursor:"pointer"}}>⚇</button>}
-          <button onClick={()=>setPage("settings")} title="Profile & settings" style={{width:34,height:34,borderRadius:"50%",overflow:"hidden",border:`1px solid ${page==="settings"?T.gBright:T.brd}`,background:`linear-gradient(135deg,${T.gMid},${T.ambL})`,color:"#fff",fontWeight:700,fontFamily:"Fraunces,serif",cursor:"pointer",padding:0}}>{user?.avatar?<img src={user.avatar} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:((user?.display_name||"U").charAt(0)).toUpperCase()}</button>
+          <button onClick={()=>setPage("settings")} title="Profile & settings" style={{width:34,height:34,borderRadius:"50%",overflow:"hidden",border:`1px solid ${page==="settings"?T.gBright:T.brd}`,background:`linear-gradient(135deg,${T.gMid},${T.ambL})`,color:"#fff",fontWeight:700,fontFamily:"'Space Grotesk',sans-serif",cursor:"pointer",padding:0}}>{user?.avatar?<img src={user.avatar} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:((user?.display_name||"U").charAt(0)).toUpperCase()}</button>
           <ThemeToggle style={{width:34,height:34}}/>
         </div>
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>{pages}</div>
-        <nav style={{display:"flex",borderTop:`1px solid ${T.brd}`,background:T.bgCard,flexShrink:0,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
+        <nav style={{display:"flex",borderTop:`1px solid ${T.glassBrd}`,background:T.glass,backdropFilter:"blur(18px) saturate(140%)",WebkitBackdropFilter:"blur(18px) saturate(140%)",flexShrink:0,paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
           {NAV.map(n=>{const on=page===n.id;return(
             <button key={n.id} onClick={()=>setPage(n.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:3,padding:"9px 0 11px",border:"none",background:"transparent",color:on?T.gBright:T.txtF}}>
               <span style={{fontSize:21}}>{n.ic}</span><span style={{fontSize:10.5,fontWeight:on?600:500}}>{n.l}</span>
@@ -2441,10 +2632,10 @@ const Shell = ({ user, setUser, onLogout }) => {
   return(
     <div className="app-h" style={{display:"flex",overflow:"hidden"}}>
       {modals}
-      <nav style={{width:230,background:T.bgCard,borderRight:`1px solid ${T.brd}`,display:"flex",flexDirection:"column",padding:18,flexShrink:0}}>
+      <nav style={{width:230,background:T.glass,backdropFilter:"blur(18px) saturate(140%)",WebkitBackdropFilter:"blur(18px) saturate(140%)",borderRight:`1px solid ${T.glassBrd}`,display:"flex",flexDirection:"column",padding:18,flexShrink:0}}>
         <Row g={10} style={{padding:"6px 8px 22px"}}>
-          <div style={{width:36,height:36,borderRadius:11,background:T.gMid,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"Fraunces,serif",fontWeight:800,fontSize:20}}>S</div>
-          <div style={{fontFamily:"Fraunces,serif",fontWeight:700,fontSize:20}}>Summit</div>
+          <div style={{width:36,height:36,borderRadius:11,background:T.gMid,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Space Grotesk',sans-serif",fontWeight:800,fontSize:20}}>S</div>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontWeight:700,fontSize:20}}>Summit</div>
         </Row>
         <Col g={3}>
           {navItems.map(n=>{const on=page===n.id;return(
@@ -2455,19 +2646,19 @@ const Shell = ({ user, setUser, onLogout }) => {
         </Col>
         <div style={{marginTop:"auto"}}>
           <Row g={10} style={{padding:"12px 8px 0",borderTop:`1px solid ${T.brd}`}}>
-            <div onClick={()=>setPage("settings")} title="Profile & settings" style={{width:34,height:34,borderRadius:10,overflow:"hidden",background:`linear-gradient(135deg,${T.gMid},${T.ambL})`,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,cursor:"pointer",fontFamily:"Fraunces,serif"}}>{user?.avatar?<img src={user.avatar} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:((user?.display_name||"U").charAt(0)).toUpperCase()}</div>
+            <div onClick={()=>setPage("settings")} title="Profile & settings" style={{width:34,height:34,borderRadius:10,overflow:"hidden",background:`linear-gradient(135deg,${T.gMid},${T.ambL})`,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:700,cursor:"pointer",fontFamily:"'Space Grotesk',sans-serif"}}>{user?.avatar?<img src={user.avatar} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:((user?.display_name||"U").charAt(0)).toUpperCase()}</div>
             <div onClick={()=>setPage("settings")} style={{flex:1,minWidth:0,cursor:"pointer"}}><div style={{fontSize:13.5,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{user?.display_name||"Hiker"}</div><div style={{fontSize:12,color:T.txtF}}>{isAdmin?"Administrator":"Free plan"}</div></div>
             <span onClick={onLogout} title="Sign out" style={{cursor:"pointer",color:T.txtF,fontSize:16,padding:"0 4px"}}>⎋</span>
             <ThemeToggle/>
           </Row>
-          <div style={{padding:"10px 8px 0",fontFamily:"'Spline Sans Mono',monospace",fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",color:T.txtF,lineHeight:1.5}}>
+          <div style={{padding:"10px 8px 0",fontFamily:"'JetBrains Mono',monospace",fontSize:9,letterSpacing:"0.12em",textTransform:"uppercase",color:T.txtF,lineHeight:1.5}}>
             Powered by<br/>Daie DillyAI Enterprise<br/>{BUILD_VERSION}
           </div>
         </div>
       </nav>
       <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0,background:T.bg}}>
-        <Row style={{height:64,padding:"0 26px",borderBottom:`1px solid ${T.brd}`,justifyContent:"space-between",background:T.bgCard,flexShrink:0}}>
-          <div style={{fontFamily:"Fraunces,serif",fontSize:20,fontWeight:700}}>{TITLES[page]}</div>
+        <Row style={{height:64,padding:"0 26px",borderBottom:`1px solid ${T.glassBrd}`,justifyContent:"space-between",background:T.glass,backdropFilter:"blur(18px) saturate(140%)",WebkitBackdropFilter:"blur(18px) saturate(140%)",flexShrink:0,zIndex:5}}>
+          <div style={{fontFamily:"'Space Grotesk',sans-serif",fontSize:20,fontWeight:700}}>{TITLES[page]}</div>
           <Row g={12}>
             {statusPill}
             {page!=="explore"&&<div style={{position:"relative",width:220}}><span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:T.txtF,pointerEvents:"none"}}>⌕</span>
@@ -2856,7 +3047,7 @@ const Intro = ({ onDone }) => {
       <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "center", pointerEvents: "none", padding: 24 }}>
         <div style={{ overflow: "hidden", padding: "0 .1em" }}>
-          <div style={{ fontFamily: "'Fraunces',serif", fontWeight: 800, fontSize: "clamp(52px, 13vw, 132px)",
+          <div style={{ fontFamily: "'Space Grotesk',sans-serif", fontWeight: 800, fontSize: "clamp(52px, 13vw, 132px)",
             color: "#fff", letterSpacing: "-0.02em", lineHeight: 1, textShadow: "0 8px 60px rgba(0,0,0,.6)",
             transform: phase >= 1 ? "translateY(0)" : "translateY(115%)",
             opacity: phase >= 1 ? 1 : 0, transition: "transform 1.1s cubic-bezier(.16,1,.3,1), opacity 1.1s ease" }}>
@@ -2865,7 +3056,7 @@ const Intro = ({ onDone }) => {
         </div>
         <div style={{ height: 1.5, background: "linear-gradient(90deg, transparent, #E8763A, transparent)",
           width: phase >= 2 ? "min(380px, 70vw)" : 0, transition: "width 1s cubic-bezier(.16,1,.3,1)", margin: "18px 0" }} />
-        <div style={{ fontFamily: "'Inter Tight',sans-serif", fontSize: "clamp(13px, 2.4vw, 17px)",
+        <div style={{ fontFamily: "'Sora',sans-serif", fontSize: "clamp(13px, 2.4vw, 17px)",
           color: "rgba(255,255,255,.78)", letterSpacing: "0.04em", fontWeight: 400,
           opacity: phase >= 2 ? 1 : 0, transform: phase >= 2 ? "translateY(0)" : "translateY(12px)",
           transition: "all 1s ease .1s", textAlign: "center" }}>
@@ -2876,13 +3067,13 @@ const Intro = ({ onDone }) => {
       {/* Skip */}
       <button onClick={finish} style={{ position: "absolute", bottom: 28, right: 28, padding: "9px 18px",
         borderRadius: 24, border: "1px solid rgba(255,255,255,.25)", background: "rgba(255,255,255,.08)",
-        color: "rgba(255,255,255,.85)", fontFamily: "'Inter Tight',sans-serif", fontSize: 13, fontWeight: 500,
+        color: "rgba(255,255,255,.85)", fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 500,
         backdropFilter: "blur(8px)", cursor: "pointer" }}>
         Skip intro →
       </button>
 
       {/* Loading hint, early only */}
-      <div style={{ position: "absolute", bottom: 30, left: 28, fontFamily: "'Spline Sans Mono',monospace",
+      <div style={{ position: "absolute", bottom: 30, left: 28, fontFamily: "'JetBrains Mono',monospace",
         fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,.4)",
         opacity: phase === 0 ? 1 : 0, transition: "opacity .6s ease" }}>
         Charting the route…
@@ -2890,7 +3081,7 @@ const Intro = ({ onDone }) => {
 
       {/* Powered-by credit */}
       <div style={{ position: "absolute", bottom: 30, left: 0, right: 0, textAlign: "center",
-        fontFamily: "'Spline Sans Mono',monospace", fontSize: 10.5, letterSpacing: "0.16em",
+        fontFamily: "'JetBrains Mono',monospace", fontSize: 10.5, letterSpacing: "0.16em",
         textTransform: "uppercase", color: "rgba(255,255,255,.5)", pointerEvents: "none",
         opacity: phase >= 2 ? 1 : 0, transition: "opacity 1s ease .2s" }}>
         Powered by Daie DillyAI Enterprise · {BUILD_VERSION}
