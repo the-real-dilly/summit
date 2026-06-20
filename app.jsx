@@ -4,7 +4,7 @@ const { useState, useRef, useEffect, useCallback, createContext, useContext } = 
 
 
 // Build version — shown next to the "Powered by" credit. Bump on each release.
-const BUILD_VERSION = "v1.0-beta";
+const BUILD_VERSION = "v6.1.0";
 
 // ════════════════════════════════════════════════════════════════════════════
 //  THEME — "Field Guide": bright modern SaaS × printed trail-guide warmth.
@@ -1221,9 +1221,150 @@ const TopoMap2D = ({ route }) => {
 };
 const mapBtn={width:34,height:34,background:`${T.bgCard}ee`,backdropFilter:"blur(8px)",border:`1px solid ${T.brd}`,borderRadius:7,color:T.txt,fontSize:17,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"};
 
-// ════════════════════════════════════════════════════════════════════════════
-//  MODALS — forms
-// ════════════════════════════════════════════════════════════════════════════
+// ── MapLibre GL 3D — beta photorealistic terrain viewer ──────────────────────
+// Loads MapLibre GL JS from CDN, drapes Esri World Imagery over AWS Terrain
+// Tiles (Terrarium format, no key). Shows real summit elevations + route track.
+let _maplibrePromise = null;
+const loadMapLibre = () => {
+  if (typeof window !== "undefined" && window.maplibregl) return Promise.resolve(window.maplibregl);
+  if (_maplibrePromise) return _maplibrePromise;
+  _maplibrePromise = new Promise((resolve, reject) => {
+    const css = document.createElement("link");
+    css.rel = "stylesheet";
+    css.href = "https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.css";
+    document.head.appendChild(css);
+    const js = document.createElement("script");
+    js.src = "https://unpkg.com/maplibre-gl@4.7.0/dist/maplibre-gl.js";
+    js.onload = () => resolve(window.maplibregl);
+    js.onerror = () => reject(new Error("maplibre-load-failed"));
+    document.head.appendChild(js);
+  });
+  return _maplibrePromise;
+};
+
+const MapLibre3D = ({ route, onUnavailable }) => {
+  const elRef = useRef(null);
+  const mapRef = useRef(null);
+  const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [pitch, setPitch] = useState(60);
+
+  // Centre + zoom from the route's track midpoint
+  const [cLat, cLon] = routeCoord(route);
+
+  useEffect(() => {
+    let cancelled = false;
+    const failTimer = setTimeout(() => { if (!cancelled && !mapRef.current) { setFailed(true); if (onUnavailable) onUnavailable(); } }, 10000);
+    loadMapLibre().then(ml => {
+      if (cancelled || !elRef.current || mapRef.current) return;
+      clearTimeout(failTimer);
+      const map = new ml.Map({
+        container: elRef.current,
+        style: {
+          version: 8,
+          sources: {
+            // Esri World Imagery — same no-key source as the 2D map
+            imagery: {
+              type: "raster",
+              tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+              tileSize: 256,
+              attribution: "Tiles © Esri, Maxar, Earthstar Geographics",
+            },
+            // AWS Terrain Tiles (Terrarium elevation encoding — free, no key)
+            terrain_tiles: {
+              type: "raster-dem",
+              tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
+              tileSize: 256,
+              encoding: "terrarium",
+              attribution: "Terrain: Mapzen/AWS",
+            },
+          },
+          layers: [{ id: "imagery", type: "raster", source: "imagery" }],
+          terrain: { source: "terrain_tiles", exaggeration: 1.5 },
+          sky: {
+            "sky-color": "#1a2744",
+            "sky-horizon-blend": 0.5,
+            "horizon-color": "#a0b4d0",
+            "horizon-fog-blend": 0.8,
+            "fog-color": "#d0dde8",
+            "fog-ground-blend": 0.9,
+          },
+        },
+        center: [cLon, cLat],
+        zoom: 12,
+        pitch: 60,
+        bearing: -20,
+        antialias: true,
+      });
+
+      map.on("load", () => {
+        if (cancelled) return;
+        // Draw the route track as a glowing blue line
+        const coords = (route?.track || route?.track_points || [])
+          .filter(p => typeof p.lat === "number")
+          .map(p => [p.lon ?? p.lng, p.lat]);
+        if (coords.length > 1) {
+          map.addSource("route", { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: coords } } });
+          // Shadow under the line
+          map.addLayer({ id: "route-shadow", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#000", "line-width": 7, "line-blur": 4, "line-opacity": 0.5 } });
+          // Bright blue line
+          map.addLayer({ id: "route-line", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#4db8ff", "line-width": 4, "line-opacity": 0.95 } });
+          // Bright core
+          map.addLayer({ id: "route-core", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#dff4ff", "line-width": 1.5, "line-opacity": 0.85 } });
+          // Trailhead + summit markers
+          [[coords[0], "#2fbf6c", "Trailhead"], [coords[coords.length-1], "#FF8A5B", "Summit"]].forEach(([c, color, label]) => {
+            const el = document.createElement("div");
+            el.style.cssText = `width:14px;height:14px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 10px ${color}`;
+            new ml.Marker({ element: el }).setLngLat(c).setPopup(new ml.Popup({ offset: 16 }).setText(label)).addTo(map);
+          });
+          // Fly the camera along the route for a cinematic intro
+          map.fitBounds([[Math.min(...coords.map(c=>c[0])), Math.min(...coords.map(c=>c[1]))], [Math.max(...coords.map(c=>c[0])), Math.max(...coords.map(c=>c[1]))]], { padding: 60, pitch: 60, bearing: -20, duration: 2000 });
+        }
+        setReady(true);
+      });
+      map.on("error", () => { if (!cancelled) { setFailed(true); if (onUnavailable) onUnavailable(); } });
+      mapRef.current = map;
+    }).catch(() => { if (!cancelled) { setFailed(true); if (onUnavailable) onUnavailable(); } });
+    return () => { cancelled = true; clearTimeout(failTimer); if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
+  // eslint-disable-next-line
+  }, []);
+
+  // Update pitch when slider changes
+  useEffect(() => { if (mapRef.current) { mapRef.current.setPitch(pitch); } }, [pitch]);
+  // Update route when selection changes
+  useEffect(() => {
+    const map = mapRef.current; if (!map || !ready) return;
+    const coords = (route?.track || route?.track_points || []).filter(p => typeof p.lat === "number").map(p => [p.lon ?? p.lng, p.lat]);
+    if (!coords.length) return;
+    const src = map.getSource("route");
+    if (src) src.setData({ type: "Feature", geometry: { type: "LineString", coordinates: coords } });
+    map.flyTo({ center: [cLon, cLat], pitch: 60, bearing: -20, zoom: 12, duration: 1000 });
+  }, [route, ready, cLat, cLon]);
+
+  if (failed) return (
+    <div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:8,color:T.txtD,background:T.bg}}>
+      <div style={{fontSize:13}}>3D terrain unavailable (needs network + WebGL).</div>
+      <div style={{fontSize:11,color:T.txtF}}>Try the 2D map or check your connection.</div>
+    </div>
+  );
+
+  return (
+    <div style={{width:"100%",height:"100%",position:"relative"}}>
+      <div ref={elRef} style={{width:"100%",height:"100%"}}/>
+      {!ready && <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:`${T.bg}cc`,color:T.txtD,fontSize:12,gap:8}}><Spin s={16}/> Loading 3D terrain…</div>}
+      {/* Pitch slider */}
+      {ready && <div style={{position:"absolute",right:14,top:"50%",transform:"translateY(-50%)",zIndex:10,display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+        <div style={{fontSize:9,color:"rgba(255,255,255,.7)",textTransform:"uppercase",letterSpacing:"0.08em"}}>Pitch</div>
+        <input type="range" min={0} max={85} value={pitch} onChange={e=>setPitch(+e.target.value)} style={{WebkitAppearance:"slider-vertical",writingMode:"vertical-lr",direction:"rtl",height:80,width:20,opacity:.85,cursor:"pointer"}}/>
+        <div style={{fontSize:9,color:"rgba(255,255,255,.7)"}}>{pitch}°</div>
+      </div>}
+      {/* Beta badge */}
+      <div style={{position:"absolute",bottom:14,left:14,zIndex:10}}>
+        <Badge c="p">β Beta · MapLibre 3D Terrain</Badge>
+      </div>
+    </div>
+  );
+};
 const NewRouteModal = ({ onClose }) => {
   const { addRoute } = useStore();
   const [f,setF]=useState({name:"",loc:"",dist:"",gain:"",diff:"moderate",time:""});
@@ -1573,8 +1714,10 @@ const Explore = ({ openNewRoute }) => {
   const { routes, deleteRoute, exportGpx, startTrip, toast, online } = useStore();
   const { isMobile } = useTheme();
   const [sel,setSel]=useState(routes[1]||routes[0]);
-  const [show3D,setShow3D]=useState(false);
-  const [webglOK,setWebglOK]=useState(true);  // flips false if 3D reports WebGL unavailable
+  const [viewMode,setViewMode]=useState("map"); // "map" | "3d" | "3d-beta"
+  const [webglOK,setWebglOK]=useState(true);
+  const show3D = viewMode==="3d";
+  const showBeta = viewMode==="3d-beta";
   const [filter,setFilter]=useState("all");
   const [search,setSearch]=useState("");
   const [detail,setDetail]=useState(null); // full route w/ track for 3D
@@ -1618,7 +1761,8 @@ const Explore = ({ openNewRoute }) => {
                 </div>
                 <Col g={6} style={{marginTop:12}}>
                   <Row g={6}><Btn style={{flex:1}} onClick={()=>startTrip(r)}>Start Trip</Btn>
-                    <Btn v={show3D?"active":"ghost"} onClick={()=>setShow3D(s=>!s)} ic={<span style={{fontSize:12}}>🏔</span>}>3D</Btn></Row>
+                    {webglOK&&<Btn v={show3D?"active":"ghost"} onClick={()=>setViewMode(m=>m==="3d"?"map":"3d")} ic={<span style={{fontSize:12}}>🏔</span>}>3D</Btn>}
+                    <Btn v={showBeta?"active":"ghost"} onClick={()=>setViewMode(m=>m==="3d-beta"?"map":"3d-beta")} ic={<span style={{fontSize:10}}>🛰</span>} title="MapLibre 3D terrain — beta">β</Btn></Row>
                   <Row g={6}><Btn v="ghost" style={{flex:1}} onClick={()=>exportGpx(r)} ic={<span style={{fontSize:11}}>↓</span>}>Export GPX</Btn>
                     <Btn v="danger" onClick={()=>{deleteRoute(r.id);}} ic={<span style={{fontSize:11}}>🗑</span>}>Delete</Btn></Row>
                 </Col>
@@ -1635,10 +1779,16 @@ const Explore = ({ openNewRoute }) => {
         </div>
       </div>
       <div style={{flex:1,position:"relative",overflow:"hidden",order:isMobile?1:2,minHeight:isMobile?240:0}}>
-        {show3D&&webglOK
-          ? <Trail3D route={view3D} onUnavailable={()=>{setWebglOK(false);setShow3D(false);}}/>
-          : <TopoMap2D route={view3D}/>}
-        {webglOK&&<div style={{position:"absolute",top:14,right:14,zIndex:600}}><Btn v={show3D?"active":"subtle"} sz="sm" onClick={()=>setShow3D(s=>!s)} ic={<span style={{fontSize:13}}>🏔</span>}>{show3D?"2D Map":"3D View"}</Btn></div>}
+        {showBeta
+          ? <MapLibre3D route={view3D} onUnavailable={()=>setViewMode("map")}/>
+          : show3D&&webglOK
+            ? <Trail3D route={view3D} onUnavailable={()=>{setWebglOK(false);setViewMode("map");}}/>
+            : <TopoMap2D route={view3D}/>}
+        {/* View mode toggle — top right */}
+        <div style={{position:"absolute",top:14,right:14,zIndex:600,display:"flex",gap:6}}>
+          {webglOK&&<Btn v={show3D?"active":"subtle"} sz="sm" onClick={()=>setViewMode(m=>m==="3d"?"map":"3d")} ic={<span style={{fontSize:12}}>🏔</span>}>{show3D?"2D Map":"3D"}</Btn>}
+          <Btn v={showBeta?"active":"subtle"} sz="sm" onClick={()=>setViewMode(m=>m==="3d-beta"?"map":"3d-beta")} ic={<span style={{fontSize:11}}>🛰</span>}>{showBeta?"Exit Beta":"3D Map β"}</Btn>
+        </div>
       </div>
     </div>
   );
